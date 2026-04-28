@@ -481,6 +481,26 @@ class StorefrontViewTests(TestCase):
             source_sku="STORE-01-L",
             stock_status=Product.StockStatus.OUT_OF_STOCK,
         )
+        self.other_brand = Brand.objects.create(
+            name="Evening Label",
+            website_url="https://example.net",
+        )
+        self.other_product = Product.objects.create(
+            brand=self.other_brand,
+            source_url="https://example.net/products/night-bloom",
+            title="Night Bloom Set",
+            description="A dressy set for festive evenings.",
+            source_sku="NIGHT-02",
+            manual_price=Decimal("499.00"),
+            stock_status=Product.StockStatus.OUT_OF_STOCK,
+            sync_status=Product.SyncStatus.ACTIVE,
+            is_published=True,
+        )
+        self.other_product.variants.create(
+            name="S / Black",
+            source_sku="NIGHT-02-S",
+            stock_status=Product.StockStatus.OUT_OF_STOCK,
+        )
 
     def test_index_renders_database_products(self):
         response = self.client.get(reverse("meherloom:index"))
@@ -507,6 +527,26 @@ class StorefrontViewTests(TestCase):
         self.assertContains(response, "Imported catalog, ready for preorder.")
         self.assertContains(response, "Store Dress")
         self.assertContains(response, "M / Beige")
+
+    def test_shop_page_filters_by_brand_and_stock(self):
+        response = self.client.get(
+            reverse("meherloom:shop"),
+            {"brand": str(self.brand.pk), "stock": Product.StockStatus.IN_STOCK},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Store Dress")
+        self.assertNotContains(response, "Night Bloom Set")
+
+    def test_shop_page_filters_by_search_and_price_range(self):
+        response = self.client.get(
+            reverse("meherloom:shop"),
+            {"q": "Night", "min_price": "400", "max_price": "550"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Night Bloom Set")
+        self.assertNotContains(response, "Store Dress")
 
 
 class AdminActionTests(TestCase):

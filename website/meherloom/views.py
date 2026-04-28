@@ -1,5 +1,8 @@
+from decimal import Decimal, InvalidOperation
+
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
+from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 import re
 
@@ -34,11 +37,69 @@ def shop(request):
         Product.objects.filter(is_published=True)
         .select_related("brand")
         .prefetch_related("images", "variants")
-        .order_by("-updated_at")
     )
+    active_brands = Brand.objects.filter(is_active=True).order_by("name")
+
+    query = request.GET.get("q", "").strip()
+    brand_value = request.GET.get("brand", "").strip()
+    stock_value = request.GET.get("stock", "").strip()
+    min_price = request.GET.get("min_price", "").strip()
+    max_price = request.GET.get("max_price", "").strip()
+
+    if query:
+        products = products.filter(
+            Q(title__icontains=query)
+            | Q(description__icontains=query)
+            | Q(source_sku__icontains=query)
+            | Q(brand__name__icontains=query)
+        )
+
+    if brand_value.isdigit():
+        products = products.filter(brand_id=int(brand_value))
+
+    valid_stock_values = {
+        Product.StockStatus.IN_STOCK,
+        Product.StockStatus.OUT_OF_STOCK,
+        Product.StockStatus.UNKNOWN,
+    }
+    if stock_value in valid_stock_values:
+        products = products.filter(stock_status=stock_value)
+
+    min_price_value = _parse_decimal(min_price)
+    if min_price_value is not None:
+        products = products.filter(manual_price__gte=min_price_value)
+
+    max_price_value = _parse_decimal(max_price)
+    if max_price_value is not None:
+        products = products.filter(manual_price__lte=max_price_value)
+
+    products = products.order_by("-updated_at")
+    active_filter_count = sum(
+        1
+        for value in (
+            query,
+            brand_value if brand_value.isdigit() else "",
+            stock_value if stock_value in valid_stock_values else "",
+            min_price if min_price_value is not None else "",
+            max_price if max_price_value is not None else "",
+        )
+        if value
+    )
+
     context = {
         "products": products,
-        "active_brands": Brand.objects.filter(is_active=True).order_by("name"),
+        "active_brands": active_brands,
+        "search_query": query,
+        "selected_brand": brand_value,
+        "selected_stock": stock_value,
+        "min_price": min_price,
+        "max_price": max_price,
+        "stock_choices": (
+            (Product.StockStatus.IN_STOCK, "In stock"),
+            (Product.StockStatus.OUT_OF_STOCK, "Out of stock"),
+            (Product.StockStatus.UNKNOWN, "Stock unknown"),
+        ),
+        "active_filter_count": active_filter_count,
     }
     return render(request, "meherloom/shop.html", context)
 
@@ -159,3 +220,12 @@ def _build_display_variants(product):
             }
         )
     return variants
+
+
+def _parse_decimal(value):
+    if not value:
+        return None
+    try:
+        return Decimal(value)
+    except (InvalidOperation, TypeError, ValueError):
+        return None

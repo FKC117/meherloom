@@ -49,11 +49,97 @@
                 {% endfor %}
             </div>
 
+            <section class="mt-8 rounded-[2rem] border border-black/5 bg-white/80 p-5 shadow-soft sm:p-6">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <p class="text-xs font-extrabold uppercase tracking-[0.3em] text-clay">Filter Catalog</p>
+                        <h2 class="mt-2 font-serif text-3xl leading-none text-ink">Search by brand, stock, or price range.</h2>
+                    </div>
+                    {% if active_filter_count %}
+                        <a href="{% url 'meherloom:shop' %}" class="text-sm font-bold text-clay transition hover:text-cocoa">
+                            Clear all filters
+                        </a>
+                    {% endif %}
+                </div>
+
+                <form method="get" class="mt-6 grid gap-4 lg:grid-cols-[1.6fr_1fr_1fr_0.7fr_0.7fr_auto] lg:items-end">
+                    <label class="block">
+                        <span class="text-xs font-bold uppercase tracking-[0.2em] text-ink/55">Search</span>
+                        <input
+                            type="search"
+                            name="q"
+                            value="{{ search_query }}"
+                            placeholder="Search product, SKU, or brand"
+                            class="mt-2 w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm text-ink outline-none transition focus:border-clay"
+                        >
+                    </label>
+                    <label class="block">
+                        <span class="text-xs font-bold uppercase tracking-[0.2em] text-ink/55">Brand</span>
+                        <select name="brand" class="mt-2 w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm text-ink outline-none transition focus:border-clay">
+                            <option value="">All brands</option>
+                            {% for brand in active_brands %}
+                                <option value="{{ brand.pk }}"{% if selected_brand == brand.pk|stringformat:"s" %} selected{% endif %}>
+                                    {{ brand.name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <label class="block">
+                        <span class="text-xs font-bold uppercase tracking-[0.2em] text-ink/55">Stock</span>
+                        <select name="stock" class="mt-2 w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm text-ink outline-none transition focus:border-clay">
+                            <option value="">Any status</option>
+                            {% for value, label in stock_choices %}
+                                <option value="{{ value }}"{% if selected_stock == value %} selected{% endif %}>
+                                    {{ label }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <label class="block">
+                        <span class="text-xs font-bold uppercase tracking-[0.2em] text-ink/55">Min BDT</span>
+                        <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            name="min_price"
+                            value="{{ min_price }}"
+                            placeholder="0"
+                            class="mt-2 w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm text-ink outline-none transition focus:border-clay"
+                        >
+                    </label>
+                    <label class="block">
+                        <span class="text-xs font-bold uppercase tracking-[0.2em] text-ink/55">Max BDT</span>
+                        <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            name="max_price"
+                            value="{{ max_price }}"
+                            placeholder="10000"
+                            class="mt-2 w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm text-ink outline-none transition focus:border-clay"
+                        >
+                    </label>
+                    <button type="submit" class="rounded-2xl bg-cocoa px-5 py-3 text-sm font-bold text-white transition hover:-translate-y-0.5">
+                        Apply
+                    </button>
+                </form>
+            </section>
+
             <div class="mt-8 grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
                 {% for product in products %}
-                    <article class="group overflow-hidden rounded-[2rem] border border-black/5 bg-white shadow-soft transition duration-300 hover:-translate-y-1">
-                        <div class="h-72 bg-gradient-to-br from-[#f5e8df] via-[#ead7ca] to-[#d3af9a] p-5">
-                            <div class="flex items-start justify-between gap-3">
+                    <article class="group overflow-hidden rounded-[2rem] border border-black/5 bg-white shadow-soft transition duration-300 hover:-translate-y-1 hover:shadow-[0_28px_80px_rgba(52,30,26,0.14)]">
+                        <div class="relative aspect-[4/5] overflow-hidden bg-[#f5e8df]">
+                            {% with cover_image=product.images.first %}
+                                {% if cover_image %}
+                                    <img src="{{ cover_image.image_url }}" alt="{{ cover_image.alt_text|default:product.title }}" class="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]">
+                                {% else %}
+                                    <div class="flex h-full items-center justify-center bg-gradient-to-br from-[#f5e8df] via-[#ead7ca] to-[#d3af9a] text-sm font-bold uppercase tracking-[0.2em] text-cocoa/60">
+                                        No image yet
+                                    </div>
+                                {% endif %}
+                            {% endwith %}
+                            <div class="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-[#201516]/55 via-[#201516]/10 to-transparent"></div>
+                            <div class="absolute inset-x-0 top-0 flex items-start justify-between gap-3 p-5">
                                 <span class="rounded-full bg-white/85 px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.24em] text-clay">
                                     {{ product.brand.name }}
                                 </span>
@@ -61,29 +147,33 @@
                                     {{ product.get_stock_status_display }}
                                 </span>
                             </div>
-                            <div class="mt-24">
-                                <p class="text-sm font-semibold uppercase tracking-[0.22em] text-cocoa/60">
+                            <div class="absolute inset-x-0 bottom-0 p-5">
+                                <p class="text-[11px] font-bold uppercase tracking-[0.3em] text-white/80">
                                     {{ product.source_sku|default:"Imported Product" }}
                                 </p>
-                                <h2 class="mt-2 font-serif text-4xl leading-none text-ink">{{ product.title|default:"Untitled Product" }}</h2>
                             </div>
                         </div>
-                        <div class="p-5">
-                            <p class="min-h-[4.5rem] text-sm leading-7 text-ink/65">{{ product.description|truncatechars:110|default:"Imported product details will appear here after sync." }}</p>
-                            <div class="mt-4 flex flex-wrap gap-2">
-                                {% for variant in product.variants.all|slice:":3" %}
-                                    <span class="rounded-full bg-black/5 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.15em] text-ink/65">
+                        <div class="flex min-h-[15.5rem] flex-col p-5">
+                            <h2 class="font-serif text-[2.05rem] leading-[0.95] text-ink [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:3] overflow-hidden">
+                                {{ product.title|default:"Untitled Product" }}
+                            </h2>
+                            <p class="mt-3 min-h-[4.5rem] text-sm leading-7 text-ink/65 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:3] overflow-hidden">
+                                {{ product.description|default:"Imported product details will appear here after sync." }}
+                            </p>
+                            <div class="mt-4 flex min-h-[2.5rem] flex-wrap gap-2">
+                                {% for variant in product.variants.all|slice:":2" %}
+                                    <span class="rounded-full border border-black/8 bg-[#f8f2ec] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.15em] text-ink/70">
                                         {{ variant.name }}
                                     </span>
                                 {% endfor %}
-                                {% if product.variants.count > 3 %}
-                                    <span class="rounded-full bg-black/5 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.15em] text-ink/65">
-                                        +{{ product.variants.count|add:"-3" }} more
+                                {% if product.variants.count > 2 %}
+                                    <span class="rounded-full border border-black/8 bg-[#f8f2ec] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.15em] text-ink/55">
+                                        +{{ product.variants.count|add:"-2" }} more
                                     </span>
                                 {% endif %}
                             </div>
-                            <div class="mt-5 flex items-center justify-between gap-4">
-                                <span class="text-xl font-extrabold text-ink">{{ product.manual_price }}</span>
+                            <div class="mt-auto flex items-center justify-between gap-4 pt-5">
+                                <span class="text-xl font-extrabold text-ink">&#2547;{{ product.manual_price|floatformat:2 }}</span>
                                 <a href="{% url 'meherloom:product_detail' product.pk %}" class="rounded-full border border-ink/10 px-4 py-2 text-sm font-bold text-ink transition group-hover:border-clay group-hover:text-clay">
                                     View Product
                                 </a>
@@ -92,7 +182,11 @@
                     </article>
                 {% empty %}
                     <div class="rounded-[2rem] border border-dashed border-ink/15 bg-white/70 p-10 text-center text-ink/65 sm:col-span-2 xl:col-span-4">
-                        No imported products are published yet.
+                        {% if active_filter_count %}
+                            No products match the current filters.
+                        {% else %}
+                            No imported products are published yet.
+                        {% endif %}
                     </div>
                 {% endfor %}
             </div>
