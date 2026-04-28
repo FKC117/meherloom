@@ -62,7 +62,7 @@
                     {% endif %}
                 </div>
 
-                <form method="get" class="mt-6 grid gap-4 lg:grid-cols-[1.6fr_1fr_1fr_0.7fr_0.7fr_auto] lg:items-end">
+                <form method="get" class="mt-6 grid gap-4 lg:grid-cols-[1.45fr_1fr_1fr_0.9fr_0.7fr_0.7fr_auto] lg:items-end">
                     <label class="block">
                         <span class="text-xs font-bold uppercase tracking-[0.2em] text-ink/55">Search</span>
                         <input
@@ -90,6 +90,16 @@
                             <option value="">Any status</option>
                             {% for value, label in stock_choices %}
                                 <option value="{{ value }}"{% if selected_stock == value %} selected{% endif %}>
+                                    {{ label }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <label class="block">
+                        <span class="text-xs font-bold uppercase tracking-[0.2em] text-ink/55">Sort</span>
+                        <select name="sort" class="mt-2 w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm text-ink outline-none transition focus:border-clay">
+                            {% for value, label in sort_choices %}
+                                <option value="{{ value }}"{% if selected_sort == value %} selected{% endif %}>
                                     {{ label }}
                                 </option>
                             {% endfor %}
@@ -190,6 +200,26 @@
                     </div>
                 {% endfor %}
             </div>
+
+            {% if is_paginated %}
+                <div class="mt-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <p class="text-sm text-ink/60">
+                        Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+                    </p>
+                    <div class="flex flex-wrap gap-3">
+                        {% if page_obj.has_previous %}
+                            <a href="?{% if search_query %}q={{ search_query|urlencode }}&{% endif %}{% if selected_brand %}brand={{ selected_brand }}&{% endif %}{% if selected_stock %}stock={{ selected_stock }}&{% endif %}{% if selected_sort %}sort={{ selected_sort }}&{% endif %}{% if min_price %}min_price={{ min_price }}&{% endif %}{% if max_price %}max_price={{ max_price }}&{% endif %}page={{ page_obj.previous_page_number }}" class="rounded-full border border-ink/10 bg-white px-4 py-2 text-sm font-bold text-ink transition hover:border-clay hover:text-clay">
+                                Previous
+                            </a>
+                        {% endif %}
+                        {% if page_obj.has_next %}
+                            <a href="?{% if search_query %}q={{ search_query|urlencode }}&{% endif %}{% if selected_brand %}brand={{ selected_brand }}&{% endif %}{% if selected_stock %}stock={{ selected_stock }}&{% endif %}{% if selected_sort %}sort={{ selected_sort }}&{% endif %}{% if min_price %}min_price={{ min_price }}&{% endif %}{% if max_price %}max_price={{ max_price }}&{% endif %}page={{ page_obj.next_page_number }}" class="rounded-full bg-cocoa px-4 py-2 text-sm font-bold text-white transition hover:-translate-y-0.5">
+                                Next
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endif %}
         </div>
     </div>
 </body>

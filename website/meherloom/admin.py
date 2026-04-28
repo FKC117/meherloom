@@ -143,6 +143,28 @@ class ProductAdmin(admin.ModelAdmin):
         "sync_status",
         "sync_error",
     )
+    fields = (
+        "brand",
+        "source_url",
+        "manual_price",
+        "size_guide_image",
+        "is_published",
+        "title",
+        "slug",
+        "description",
+        "size_guide",
+        "source_product_id",
+        "source_sku",
+        "source_currency",
+        "source_price",
+        "stock_status",
+        "stock_quantity",
+        "last_checked_at",
+        "last_imported_at",
+        "next_check_at",
+        "sync_status",
+        "sync_error",
+    )
 
     def save_model(self, request, obj, form, change):
         super().save_model(request, obj, form, change)

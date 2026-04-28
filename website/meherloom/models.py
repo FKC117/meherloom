@@ -63,6 +63,8 @@ class Product(TimeStampedModel):
     title = models.CharField(max_length=255, blank=True)
     slug = models.SlugField(max_length=255, blank=True)
     description = models.TextField(blank=True)
+    size_guide = models.TextField(blank=True)
+    size_guide_image = models.FileField(upload_to="size-guides/", blank=True)
     source_currency = models.CharField(max_length=10, blank=True)
     source_price = models.DecimalField(
         max_digits=10,

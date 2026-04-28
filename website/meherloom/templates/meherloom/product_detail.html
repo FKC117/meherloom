@@ -42,6 +42,7 @@
                                 class="block w-full cursor-zoom-in"
                                 data-image-src="{{ primary_image.image_url }}"
                                 data-image-alt="{{ primary_image.alt_text|default:product.title }}"
+                                onclick="window.meherloomOpenLightbox()"
                                 aria-label="Open larger image"
                             >
                                 <img
@@ -64,6 +65,7 @@
                                     class="gallery-thumb overflow-hidden rounded-[1.5rem] border-2 border-cocoa bg-white shadow-sm"
                                     data-image-src="{{ primary_image.image_url }}"
                                     data-image-alt="{{ primary_image.alt_text|default:product.title }}"
+                                    onclick="window.meherloomSwapImage('{{ primary_image.image_url|escapejs }}', '{{ primary_image.alt_text|default:product.title|escapejs }}', this)"
                                     aria-label="Show image 1"
                                 >
                                     <img src="{{ primary_image.image_url }}" alt="{{ primary_image.alt_text|default:product.title }}" class="h-36 w-full object-cover">
@@ -75,6 +77,7 @@
                                     class="gallery-thumb overflow-hidden rounded-[1.5rem] border border-black/5 bg-white shadow-sm transition hover:border-cocoa"
                                     data-image-src="{{ image.image_url }}"
                                     data-image-alt="{{ image.alt_text|default:product.title }}"
+                                    onclick="window.meherloomSwapImage('{{ image.image_url|escapejs }}', '{{ image.alt_text|default:product.title|escapejs }}', this)"
                                     aria-label="Show another product image"
                                 >
                                     <img src="{{ image.image_url }}" alt="{{ image.alt_text|default:product.title }}" class="h-36 w-full object-cover">
@@ -105,13 +108,40 @@
                     <div class="mt-8 grid gap-4 sm:grid-cols-2">
                         <div class="rounded-2xl bg-[#f7f1ea] p-4">
                             <p class="text-xs font-bold uppercase tracking-[0.2em] text-ink/45">Price</p>
-                            <p class="mt-2 text-2xl font-extrabold">৳{{ product.manual_price|floatformat:2 }}</p>
+                            <p class="mt-2 text-2xl font-extrabold">&#2547;{{ product.manual_price|floatformat:2 }}</p>
                         </div>
                         <div class="rounded-2xl bg-[#f7f1ea] p-4">
                             <p class="text-xs font-bold uppercase tracking-[0.2em] text-ink/45">Source SKU</p>
                             <p class="mt-2 text-lg font-bold">{{ product.source_sku|default:"Not captured yet" }}</p>
                         </div>
                     </div>
+
+                    {% if product.size_guide or size_guide_image_url %}
+                        <div class="mt-6 rounded-2xl border border-black/5 bg-[#fdfaf6] p-5">
+                            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                    <p class="text-xs font-bold uppercase tracking-[0.2em] text-ink/45">Sizing</p>
+                                    <p class="mt-2 text-sm leading-7 text-ink/70">
+                                        {% if size_guide_image_url %}
+                                            Manual size-guide screenshot attached for this product.
+                                        {% elif size_guide_html %}
+                                            Imported from the source brand when available.
+                                        {% else %}
+                                            This product still has an older imported size guide. Refresh it to see the full formatted table.
+                                        {% endif %}
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    id="size-guide-trigger"
+                                    class="rounded-full border border-ink/10 px-4 py-2 text-sm font-bold text-ink transition hover:border-clay hover:text-clay"
+                                    onclick="window.meherloomOpenSizeGuide()"
+                                >
+                                    View Size Guide
+                                </button>
+                            </div>
+                        </div>
+                    {% endif %}
 
                     <div class="mt-8">
                         <h2 class="text-sm font-extrabold uppercase tracking-[0.25em] text-clay">Imported Details</h2>
@@ -120,7 +150,11 @@
                                 {% for section in description_sections %}
                                     <div class="rounded-2xl border border-black/5 bg-[#fdfaf6] p-5">
                                         <h3 class="text-sm font-extrabold uppercase tracking-[0.2em] text-cocoa">{{ section.heading }}</h3>
-                                        <p class="mt-3 leading-8 text-ink/70">{{ section.content }}</p>
+                                        <div class="mt-3 space-y-2 text-ink/70">
+                                            {% for line in section.lines %}
+                                                <p class="leading-8">{{ line }}</p>
+                                            {% endfor %}
+                                        </div>
                                     </div>
                                 {% endfor %}
                             </div>
@@ -156,7 +190,7 @@
                                 <h3 class="font-serif text-3xl leading-none">{{ item.title }}</h3>
                                 <p class="mt-3 text-sm leading-7 text-ink/65">{{ item.description|truncatechars:80 }}</p>
                                 <div class="mt-4 flex items-center justify-between">
-                                    <span class="font-extrabold">{{ item.manual_price }}</span>
+                                    <span class="font-extrabold">&#2547;{{ item.manual_price|floatformat:2 }}</span>
                                     <a href="{% url 'meherloom:product_detail' item.pk %}" class="text-sm font-bold text-clay">View</a>
                                 </div>
                             </article>
@@ -173,6 +207,7 @@
                 type="button"
                 id="lightbox-close"
                 class="absolute right-6 top-6 rounded-full bg-white/10 px-4 py-2 text-sm font-bold text-white backdrop-blur"
+                onclick="window.meherloomCloseLightbox()"
                 aria-label="Close image preview"
             >
                 Close
@@ -181,70 +216,149 @@
         </div>
     </div>
 
-    <script>
-        (() => {
-            const mainTrigger = document.getElementById("gallery-main-trigger");
-            const mainImage = document.getElementById("gallery-main-image");
-            const thumbs = document.querySelectorAll(".gallery-thumb");
-            const lightbox = document.getElementById("image-lightbox");
-            const lightboxImage = document.getElementById("lightbox-image");
-            const lightboxClose = document.getElementById("lightbox-close");
+    {% if product.size_guide or size_guide_image_url %}
+        <div id="size-guide-modal" class="fixed inset-0 z-50 hidden bg-black/70 px-4 py-8">
+            <div class="mx-auto flex h-full max-w-3xl items-center justify-center">
+                <div class="w-full rounded-[2rem] bg-white p-6 shadow-2xl sm:p-8">
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                            <p class="text-xs font-extrabold uppercase tracking-[0.25em] text-clay">Size Guide</p>
+                            <h2 class="mt-2 font-serif text-4xl leading-none text-ink">{{ product.brand.name }}</h2>
+                        </div>
+                        <button
+                            type="button"
+                            id="size-guide-close"
+                            class="rounded-full border border-ink/10 px-4 py-2 text-sm font-bold text-ink transition hover:border-clay hover:text-clay"
+                            onclick="window.meherloomCloseSizeGuide()"
+                        >
+                            Close
+                        </button>
+                    </div>
+                    <div class="mt-6 rounded-2xl bg-[#fdfaf6] p-5 text-sm leading-8 text-ink/75">
+                        {% if size_guide_image_url %}
+                            <img
+                                src="{{ size_guide_image_url }}"
+                                alt="{{ product.title }} size guide"
+                                class="mx-auto max-h-[75vh] w-full rounded-xl object-contain"
+                            >
+                        {% elif size_guide_html %}
+                            {{ size_guide_html|safe }}
+                        {% elif size_guide_text %}
+                            {{ size_guide_text }}
+                        {% else %}
+                            <p>This product still has an older imported size guide. Refresh the product to load the formatted table.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
 
+    <script>
+        window.meherloomSwapImage = function (src, alt, thumb) {
+            var mainTrigger = document.getElementById("gallery-main-trigger");
+            var mainImage = document.getElementById("gallery-main-image");
+            var thumbs = document.querySelectorAll(".gallery-thumb");
             if (!mainTrigger || !mainImage) {
-                return;
+                return false;
             }
 
-            const setActiveThumb = (selectedThumb) => {
-                thumbs.forEach((thumb) => {
-                    thumb.classList.remove("border-cocoa", "border-2");
-                    thumb.classList.add("border-black/5");
+            mainImage.src = src;
+            mainImage.alt = alt;
+            mainTrigger.dataset.imageSrc = src;
+            mainTrigger.dataset.imageAlt = alt;
+
+            thumbs.forEach(function (item) {
+                item.classList.remove("border-cocoa", "border-2");
+                item.classList.add("border-black/5");
+            });
+
+            if (thumb) {
+                thumb.classList.remove("border-black/5");
+                thumb.classList.add("border-cocoa", "border-2");
+            }
+            return false;
+        };
+
+        window.meherloomOpenLightbox = function () {
+            var mainTrigger = document.getElementById("gallery-main-trigger");
+            var lightbox = document.getElementById("image-lightbox");
+            var lightboxImage = document.getElementById("lightbox-image");
+            if (!mainTrigger || !lightbox || !lightboxImage) {
+                return false;
+            }
+
+            lightboxImage.src = mainTrigger.dataset.imageSrc || "";
+            lightboxImage.alt = mainTrigger.dataset.imageAlt || "";
+            lightbox.classList.remove("hidden");
+            document.body.classList.add("overflow-hidden");
+            return false;
+        };
+
+        window.meherloomCloseLightbox = function () {
+            var lightbox = document.getElementById("image-lightbox");
+            var lightboxImage = document.getElementById("lightbox-image");
+            if (!lightbox || !lightboxImage) {
+                return false;
+            }
+
+            lightbox.classList.add("hidden");
+            lightboxImage.src = "";
+            document.body.classList.remove("overflow-hidden");
+            return false;
+        };
+
+        window.meherloomOpenSizeGuide = function () {
+            var sizeGuideModal = document.getElementById("size-guide-modal");
+            if (!sizeGuideModal) {
+                return false;
+            }
+
+            sizeGuideModal.classList.remove("hidden");
+            document.body.classList.add("overflow-hidden");
+            return false;
+        };
+
+        window.meherloomCloseSizeGuide = function () {
+            var sizeGuideModal = document.getElementById("size-guide-modal");
+            if (!sizeGuideModal) {
+                return false;
+            }
+
+            sizeGuideModal.classList.add("hidden");
+            document.body.classList.remove("overflow-hidden");
+            return false;
+        };
+
+        document.addEventListener("DOMContentLoaded", function () {
+            var lightbox = document.getElementById("image-lightbox");
+            var sizeGuideModal = document.getElementById("size-guide-modal");
+
+            if (lightbox) {
+                lightbox.addEventListener("click", function (event) {
+                    if (event.target === lightbox) {
+                        window.meherloomCloseLightbox();
+                    }
                 });
-                if (selectedThumb) {
-                    selectedThumb.classList.remove("border-black/5");
-                    selectedThumb.classList.add("border-cocoa", "border-2");
-                }
-            };
+            }
 
-            const swapMainImage = (src, alt, thumb) => {
-                mainImage.src = src;
-                mainImage.alt = alt;
-                mainTrigger.dataset.imageSrc = src;
-                mainTrigger.dataset.imageAlt = alt;
-                setActiveThumb(thumb);
-            };
-
-            thumbs.forEach((thumb) => {
-                thumb.addEventListener("click", () => {
-                    swapMainImage(thumb.dataset.imageSrc, thumb.dataset.imageAlt, thumb);
+            if (sizeGuideModal) {
+                sizeGuideModal.addEventListener("click", function (event) {
+                    if (event.target === sizeGuideModal) {
+                        window.meherloomCloseSizeGuide();
+                    }
                 });
-            });
+            }
 
-            const openLightbox = () => {
-                lightboxImage.src = mainTrigger.dataset.imageSrc;
-                lightboxImage.alt = mainTrigger.dataset.imageAlt;
-                lightbox.classList.remove("hidden");
-                document.body.classList.add("overflow-hidden");
-            };
-
-            const closeLightbox = () => {
-                lightbox.classList.add("hidden");
-                lightboxImage.src = "";
-                document.body.classList.remove("overflow-hidden");
-            };
-
-            mainTrigger.addEventListener("click", openLightbox);
-            lightboxClose.addEventListener("click", closeLightbox);
-            lightbox.addEventListener("click", (event) => {
-                if (event.target === lightbox) {
-                    closeLightbox();
+            document.addEventListener("keydown", function (event) {
+                if (event.key === "Escape" && lightbox && !lightbox.classList.contains("hidden")) {
+                    window.meherloomCloseLightbox();
+                }
+                if (event.key === "Escape" && sizeGuideModal && !sizeGuideModal.classList.contains("hidden")) {
+                    window.meherloomCloseSizeGuide();
                 }
             });
-            document.addEventListener("keydown", (event) => {
-                if (event.key === "Escape" && !lightbox.classList.contains("hidden")) {
-                    closeLightbox();
-                }
-            });
-        })();
+        });
     </script>
 </body>
 </html>

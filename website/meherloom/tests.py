@@ -1,8 +1,12 @@
 from decimal import Decimal
+import shutil
+import tempfile
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
+from django.test.utils import override_settings
 from django.urls import reverse
 
 from .management.commands.sync_brand_adapters import BRAND_ADAPTER_MAP
@@ -13,6 +17,10 @@ from .services.scrapers.generic import GenericBrandAdapter
 from .services.scrapers.agha_noor import AghaNoorBrandAdapter
 from .services.scrapers.sapphire import SapphireBrandAdapter
 from .services.scrapers.shopify import ShopifyBrandAdapter
+from .views import _split_product_description
+
+
+TEST_MEDIA_ROOT = tempfile.mkdtemp()
 
 
 class CatalogSyncTests(TestCase):
@@ -34,6 +42,7 @@ class CatalogSyncTests(TestCase):
                 return {
                     "title": "Rosewood Evening Dress",
                     "description": "Elegant silhouette",
+                    "size_guide": "S: 36 | M: 38",
                     "source_product_id": "123",
                     "source_sku": "SKU-123",
                     "source_currency": "USD",
@@ -51,6 +60,7 @@ class CatalogSyncTests(TestCase):
 
         self.assertEqual(self.product.title, "Rosewood Evening Dress")
         self.assertEqual(self.product.stock_status, Product.StockStatus.IN_STOCK)
+        self.assertEqual(self.product.size_guide, "S: 36 | M: 38")
         self.assertEqual(self.product.images.count(), 1)
         self.assertEqual(self.product.variants.count(), 1)
 
@@ -183,6 +193,87 @@ class GenericScraperTests(TestCase):
         self.assertEqual(adapter._extract_stock_quantity(payload), 3)
 
 
+class ProductDescriptionFormattingTests(TestCase):
+    def test_split_product_description_preserves_structured_sapphire_lines(self):
+        description = (
+            "Unstitched 3-Piece "
+            "Shirt Embroidered Lawn Shirt Front Panels 3pc Embroidered Lawn Sleeves 0.7m "
+            "Printed Lawn Back 1.15m Fabric: Lawn Colour: Plum "
+            "Dupatta Printed Blended Chiffon Dupatta 2.5m Fabric: Blended Chiffon Colour: Plum "
+            "Trouser Printed Cotton Trouser 2.5m Fabric: Cotton Colour: Plum "
+            "Make a statement with our three-piece embroidered plum ensemble featuring a lawn shirt paired with cotton trousers and a blended chiffon dupatta. "
+            "Note: Actual product color may vary slightly from the image."
+        )
+
+        sections = _split_product_description(description)
+
+        self.assertEqual(sections[0]["heading"], "Overview")
+        self.assertEqual(sections[0]["lines"], ["Unstitched 3-Piece"])
+        self.assertEqual(sections[1]["heading"], "Shirt")
+        self.assertEqual(
+            sections[1]["lines"],
+            [
+                "Embroidered Lawn Shirt Front Panels 3pc",
+                "Embroidered Lawn Sleeves 0.7m",
+                "Printed Lawn Back 1.15m",
+                "Fabric: Lawn",
+                "Colour: Plum",
+            ],
+        )
+        self.assertEqual(sections[2]["heading"], "Dupatta")
+        self.assertEqual(
+            sections[2]["lines"],
+            [
+                "Printed Blended Chiffon Dupatta 2.5m",
+                "Fabric: Blended Chiffon",
+                "Colour: Plum",
+            ],
+        )
+        self.assertEqual(sections[3]["heading"], "Trouser")
+        self.assertEqual(
+            sections[3]["lines"],
+            [
+                "Printed Cotton Trouser 2.5m",
+                "Fabric: Cotton",
+                "Colour: Plum",
+            ],
+        )
+        self.assertEqual(sections[4]["heading"], "Description")
+        self.assertEqual(
+            sections[4]["lines"],
+            ["Make a statement with our three-piece embroidered plum ensemble featuring a lawn shirt paired with cotton trousers and a blended chiffon dupatta."],
+        )
+        self.assertEqual(sections[5]["heading"], "Note")
+
+    def test_split_product_description_handles_ready_to_wear_two_piece_shape(self):
+        description = (
+            ": Purple Fabric: Blended Grip Silk Culottes Colour: Purple Fabric: Viscose Raw Silk "
+            "Revamp your look in our printed purple blended grip silk A-line shirt paired with matching viscose raw silk culottes. "
+            "Model Height: 5 Feet 6 Inches Model Wears Size: S View Size Chart A-Line Shirt"
+        )
+
+        sections = _split_product_description(description)
+
+        self.assertEqual(sections[0]["heading"], "Shirt")
+        self.assertEqual(
+            sections[0]["lines"],
+            [
+                "Colour: Purple",
+                "Fabric: Blended Grip Silk",
+            ],
+        )
+        self.assertEqual(sections[1]["heading"], "Culottes")
+        self.assertEqual(
+            sections[1]["lines"],
+            [
+                "Colour: Purple",
+                "Fabric: Viscose Raw Silk",
+            ],
+        )
+        self.assertEqual(sections[2]["heading"], "Description")
+        self.assertIn("Revamp your look in our printed purple blended grip silk A-line shirt", sections[2]["lines"][0])
+
+
 class ShopifyScraperTests(TestCase):
     def setUp(self):
         self.brand = Brand.objects.create(
@@ -310,6 +401,59 @@ class SapphireScraperTests(TestCase):
 
         self.assertEqual(payload["stock_status"], Product.StockStatus.OUT_OF_STOCK)
 
+    def test_sapphire_adapter_prefers_discounted_sale_price(self):
+        adapter = SapphireBrandAdapter(brand=self.brand)
+        html = """
+        <html>
+            <body>
+                <h1>Embroidered Khaddar Shirt</h1>
+                <div>Rs.5,990</div>
+                <div>Rs.1,797</div>
+                <div>SKU: 2TNS26WMV106_999</div>
+                <button>Add to Bag</button>
+            </body>
+        </html>
+        """
+
+        adapter.fetch_url = lambda url: html
+        product = Product(
+            brand=self.brand,
+            source_url="https://pk.sapphireonline.pk/collections/ready-to-wear-shop-by-category-sale/products/2TNS26WMV106_999.html",
+            manual_price=Decimal("1797.00"),
+        )
+
+        payload = adapter.fetch_product(product)
+
+        self.assertEqual(payload["source_price"], Decimal("1797"))
+
+    def test_sapphire_adapter_rejects_price_fragment_as_title_on_sale_page(self):
+        adapter = SapphireBrandAdapter(brand=self.brand)
+        html = """
+        <html>
+            <head>
+                <meta property="og:title" content="Embroidered Khaddar Shirt" />
+            </head>
+            <body>
+                <h1>Embroidered Khaddar Shirt</h1>
+                <div>Rs.5,990</div>
+                <div>Rs.1,797</div>
+                <div>5,990 to Rs.1,797 SKU: 2TNS26WMV106_999</div>
+                <button>Add to Bag</button>
+            </body>
+        </html>
+        """
+
+        adapter.fetch_url = lambda url: html
+        product = Product(
+            brand=self.brand,
+            source_url="https://pk.sapphireonline.pk/collections/ready-to-wear-shop-by-category-sale/products/2TNS26WMV106_999.html",
+            manual_price=Decimal("1797.00"),
+        )
+
+        payload = adapter.fetch_product(product)
+
+        self.assertEqual(payload["title"], "Embroidered Khaddar Shirt")
+
     def test_sapphire_adapter_prefers_html_title_sku_and_images_over_noisy_embedded_data(self):
         adapter = SapphireBrandAdapter(brand=self.brand)
         html = """
@@ -371,6 +515,37 @@ class SapphireScraperTests(TestCase):
         self.assertEqual(payload["source_product_id"], "U3PDDS26V443")
         self.assertIn("Make a sophisticated statement", payload["description"])
 
+    def test_sapphire_adapter_removes_size_guide_dump_from_description(self):
+        adapter = SapphireBrandAdapter(brand=self.brand)
+        html = """
+        <html>
+            <body>
+                <h1>Embroidered Khaddar Shirt</h1>
+                <div>Rs.1,499</div>
+                <div>SKU: 2SDEPRW25V68_999</div>
+                <button>Add to Bag</button>
+                <div>
+                    Description Shirt Fit: Regular Fit Printed With Embroidered Front Panel, Printed Back Panel, Round Neckline, Full Sleeves, Long Length
+                    Size Guide A-Line INCHES CM Size XS S M L XL Length 44 44 44 44 44 Shoulder 13.5 14 14.5 15.25 16
+                    Chest 18.5 19.5 20.5 22.25 24 Front Border 25 26 27.5 29 30.5 Arm hole 9 9.5 10 10.75 11.5 Sleeve Length 21.5 22 22.5 23 23.5 Sleeve Opening 8 8 8 8 8
+                    Note: Actual product color may vary slightly from the image.
+                </div>
+            </body>
+        </html>
+        """
+
+        adapter.fetch_url = lambda url: html
+        product = Product(
+            brand=self.brand,
+            source_url="https://pk.sapphireonline.pk/collections/ready-to-wear-shop-by-category-sale/products/2SDEPRW25V68_999.html",
+            manual_price=Decimal("1499.00"),
+        )
+
+        payload = adapter.fetch_product(product)
+
+        self.assertNotIn("INCHES CM Size", payload["description"])
+        self.assertNotIn("Size Guide A-Line", payload["description"])
+
     def test_sapphire_adapter_dedupes_resized_image_variants(self):
         adapter = SapphireBrandAdapter(brand=self.brand)
         html = """
@@ -385,6 +560,68 @@ class SapphireScraperTests(TestCase):
 
         images = adapter._extract_sapphire_images({}, {}, html)
         self.assertEqual(len(images), 2)
+
+    def test_sapphire_adapter_extracts_size_guide_modal_content(self):
+        adapter = SapphireBrandAdapter(brand=self.brand)
+        html = """
+        <html>
+            <body>
+                <h1>Printed Cambric Culottes</h1>
+                <div>Rs.2,290</div>
+                <div>SKU: S26CAHMV111T_999</div>
+                <button>Add to Bag</button>
+                <div id="size-guide-modal">
+                    <h2>Size Guide A-Line Shirt INCHES CM Size XS S M L XL Length 44 44 44 44 44 Shoulder 13.5 14 14.5 15.25 16 Chest 18.5 19.5 20.5 22.25 24 Front Border 25 26 27.5 29 30.5 Arm Hole 9 9.5 10 10.75 11.5 Sleeve Length 21.5 22 22.5 23 23.5 Sleeve Opening 8 8 8 8 8</h2>
+                </div>
+                <div>Description</div>
+            </body>
+        </html>
+        """
+
+        adapter.fetch_url = lambda url: html
+        product = Product(
+            brand=self.brand,
+            source_url="https://pk.sapphireonline.pk/collections/ready-to-wear/products/S26CAHMV111T_999.html",
+            manual_price=Decimal("2290.00"),
+        )
+
+        payload = adapter.fetch_product(product)
+
+        self.assertIn("<table", payload["size_guide"])
+        self.assertIn("A-Line Shirt", payload["size_guide"])
+        self.assertIn("Sleeve Length", payload["size_guide"])
+        self.assertIn("13.5", payload["size_guide"])
+
+    def test_sapphire_adapter_skips_broken_html_size_guide_fragment_for_text_version(self):
+        adapter = SapphireBrandAdapter(brand=self.brand)
+        html = """
+        <html>
+            <body>
+                <h1>Embroidered Khaddar Shirt</h1>
+                <div>Rs.5,990</div>
+                <div>SKU: 2SDEPRW25V68_999</div>
+                <div>Size Guide <div class="tab-pane fade show active detail-content-pane" id="nav-details"></div></div>
+                <div>
+                    Description A-Line Shirt Fit: Regular Fit Colour: Pink Fabric: Khaddar
+                    Size Guide A-Line Shirt INCHES CM Size XS S M L XL Length 44 44 44 44 44 Shoulder 13.5 14 14.5 15.25 16
+                    Chest 18.5 19.5 20.5 22.25 24 Front Border 25 26 27.5 29 30.5 Arm Hole 9 9.5 10 10.75 11.5 Sleeve Length 21.5 22 22.5 23 23.5 Sleeve Opening 8 8 8 8 8
+                    Note: Actual product color may vary slightly from the image.
+                </div>
+            </body>
+        </html>
+        """
+
+        adapter.fetch_url = lambda url: html
+        product = Product(
+            brand=self.brand,
+            source_url="https://pk.sapphireonline.pk/collections/ready-to-wear-shop-by-category-sale/products/2SDEPRW25V68_999.html",
+            manual_price=Decimal("5990.00"),
+        )
+
+        payload = adapter.fetch_product(product)
+
+        self.assertIn("<table", payload["size_guide"])
+        self.assertNotIn("tab-pane", payload["size_guide"])
 
 
 class AghaNoorScraperTests(TestCase):
@@ -454,7 +691,13 @@ class AghaNoorScraperTests(TestCase):
         self.assertEqual(payload["stock_status"], Product.StockStatus.OUT_OF_STOCK)
 
 
+@override_settings(MEDIA_ROOT=TEST_MEDIA_ROOT)
 class StorefrontViewTests(TestCase):
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        shutil.rmtree(TEST_MEDIA_ROOT, ignore_errors=True)
+
     def setUp(self):
         self.brand = Brand.objects.create(
             name="Store Brand",
@@ -465,6 +708,7 @@ class StorefrontViewTests(TestCase):
             source_url="https://example.com/products/store-dress",
             title="Store Dress",
             description="Imported copy for storefront display.",
+            size_guide="M: 38 | L: 40",
             source_sku="STORE-01",
             manual_price=Decimal("199.00"),
             stock_status=Product.StockStatus.IN_STOCK,
@@ -519,6 +763,22 @@ class StorefrontViewTests(TestCase):
         self.assertContains(response, "Origin brand")
         self.assertContains(response, "In stock")
         self.assertContains(response, "L / Beige")
+        self.assertContains(response, "View Size Guide")
+        self.assertContains(response, "M: 38 | L: 40")
+
+    def test_product_detail_prefers_uploaded_size_guide_image(self):
+        self.product.size_guide_image = SimpleUploadedFile(
+            "guide.png",
+            b"fake-image-bytes",
+            content_type="image/png",
+        )
+        self.product.save(update_fields=["size_guide_image"])
+
+        response = self.client.get(reverse("meherloom:product_detail", args=[self.product.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Manual size-guide screenshot attached for this product.")
+        self.assertContains(response, "guide.png")
 
     def test_shop_page_renders_database_products(self):
         response = self.client.get(reverse("meherloom:shop"))
@@ -547,6 +807,36 @@ class StorefrontViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Night Bloom Set")
         self.assertNotContains(response, "Store Dress")
+
+    def test_shop_page_sorts_by_price_descending(self):
+        response = self.client.get(
+            reverse("meherloom:shop"),
+            {"sort": "price_high"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        products = list(response.context["products"])
+        self.assertEqual(products[0].title, "Night Bloom Set")
+        self.assertEqual(products[1].title, "Store Dress")
+
+    def test_shop_page_is_paginated(self):
+        for index in range(13):
+            Product.objects.create(
+                brand=self.brand,
+                source_url=f"https://example.com/products/extra-{index}",
+                title=f"Extra Dress {index}",
+                manual_price=Decimal("99.00"),
+                stock_status=Product.StockStatus.IN_STOCK,
+                sync_status=Product.SyncStatus.ACTIVE,
+                is_published=True,
+            )
+
+        response = self.client.get(reverse("meherloom:shop"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["is_paginated"])
+        self.assertEqual(response.context["page_obj"].number, 1)
+        self.assertContains(response, "Next")
 
 
 class AdminActionTests(TestCase):

@@ -17,7 +17,11 @@ class SapphireBrandAdapter(GenericBrandAdapter):
     )
     image_pattern = re.compile(r"https://[^\"'\s>]+\.(?:jpg|jpeg|png|webp)(?:\?[^\"'\s>]*)?", re.IGNORECASE)
     detail_block_pattern = re.compile(
-        r"Description\s+(.*?)(?:Share this Look|Notify me when available|We['’]ll notify you|The link to|$)",
+        r"Description\s+(.*?)(?:Share this Look|Notify me when available|We'll notify you|The link to|$)",
+        re.IGNORECASE | re.DOTALL,
+    )
+    size_guide_modal_pattern = re.compile(
+        r"Size Guide\s+(.*?)(?:Model Wears|Description|Details|Share this Look|Add to Bag|Notify Me|sale starts in|Note:|$)",
         re.IGNORECASE | re.DOTALL,
     )
     size_input_pattern = re.compile(
@@ -25,6 +29,18 @@ class SapphireBrandAdapter(GenericBrandAdapter):
         re.IGNORECASE | re.DOTALL,
     )
     size_token_pattern = re.compile(r">\s*([A-Z0-9-]{1,8})\s*<")
+    size_guide_row_pattern = re.compile(r"\b(XXS|XS|S|M|L|XL|XXL)\b\s*:?\s*([0-9]{2,3}(?:\.[0-9]+)?)?", re.IGNORECASE)
+    size_marker_pattern = re.compile(r"\bSize\s+(?=(?:XXS|XS|S|M|L|XL|XXL)\b)", re.IGNORECASE)
+    size_guide_title_pattern = re.compile(r"Size Guide\s+([A-Za-z][A-Za-z -]{2,80})\s+INCHES", re.IGNORECASE)
+    size_guide_labels = (
+        "Length",
+        "Shoulder",
+        "Chest",
+        "Front Border",
+        "Arm Hole",
+        "Sleeve Length",
+        "Sleeve Opening",
+    )
 
     def fetch_product(self, product):
         html = self.fetch_url(product.source_url)
@@ -35,6 +51,7 @@ class SapphireBrandAdapter(GenericBrandAdapter):
         payload = {
             "title": self._extract_title(product_data, meta, html, page_text),
             "description": self._extract_description(product_data, meta, html, page_text),
+            "size_guide": self._extract_size_guide(html, page_text),
             "source_product_id": self._extract_product_id(product_data, product.source_url),
             "source_sku": self._extract_sku(product_data, html, page_text),
             "source_currency": product_data.get("offers", {}).get("priceCurrency", "") if isinstance(product_data.get("offers"), dict) else "",
@@ -52,17 +69,22 @@ class SapphireBrandAdapter(GenericBrandAdapter):
     def _extract_title(self, product_data, meta, html, page_text):
         text_match = self.text_title_sku_pattern.search(page_text)
         if text_match:
-            return self._clean_title(text_match.group(1))
+            candidate = self._clean_title(text_match.group(1))
+            if self._looks_like_real_title(candidate):
+                return candidate
 
         heading_matches = self.title_heading_pattern.findall(html)
         for heading in heading_matches:
             title = self._strip_html(heading)
-            if title and "sapphire" not in title.lower():
-                return self._clean_title(title)
+            cleaned = self._clean_title(title)
+            if self._looks_like_real_title(cleaned):
+                return cleaned
 
         title = product_data.get("name") or meta.get("og:title") or meta.get("title") or ""
         if title:
-            return self._clean_title(title)
+            cleaned = self._clean_title(title)
+            if self._looks_like_real_title(cleaned):
+                return cleaned
         return ""
 
     def _extract_description(self, product_data, meta, html, page_text):
@@ -70,7 +92,24 @@ class SapphireBrandAdapter(GenericBrandAdapter):
         if match:
             description = self._clean_description(match.group(1))
             if description:
+                description = self._strip_size_guide_from_description(description)
                 return re.sub(r"\s+", " ", description).strip()
+        return ""
+
+    def _extract_size_guide(self, html, page_text):
+        for raw_source in self._candidate_size_guide_sources(html, page_text):
+            cleaned = self._strip_html(raw_source)
+            cleaned = re.sub(r"\s+", " ", cleaned).strip(" -|:")
+            if not cleaned:
+                continue
+            if self._looks_like_broken_size_guide(cleaned):
+                continue
+
+            structured_html = self._build_size_guide_html(cleaned)
+            if structured_html:
+                return structured_html
+            if self.size_marker_pattern.search(cleaned) or "inches cm" in cleaned.lower():
+                return cleaned
         return ""
 
     def _extract_sku(self, product_data, html, page_text):
@@ -87,18 +126,22 @@ class SapphireBrandAdapter(GenericBrandAdapter):
         return ""
 
     def _extract_price(self, product_data, html, page_text):
+        page_prices = self._extract_page_prices(page_text)
         structured_price, _currency = self._extract_price_from_structured_data(product_data)
-        if structured_price is not None:
+
+        if page_prices:
+            if len(page_prices) == 1:
+                page_price = page_prices[0]
+            else:
+                page_price = min(page_prices)
+
+            if structured_price is None:
+                return page_price
+            if page_price <= structured_price:
+                return page_price
             return structured_price
 
-        match = self.price_pattern.search(page_text)
-        if not match:
-            return None
-        raw = match.group(1).replace(",", "")
-        try:
-            return Decimal(raw)
-        except InvalidOperation:
-            return None
+        return structured_price
 
     def _extract_price_from_structured_data(self, product_data):
         offers = product_data.get("offers")
@@ -114,8 +157,21 @@ class SapphireBrandAdapter(GenericBrandAdapter):
         except InvalidOperation:
             return None, currency
 
+    def _extract_page_prices(self, page_text):
+        prices = []
+        seen = set()
+        for raw_price in self.price_pattern.findall(page_text):
+            try:
+                price = Decimal(raw_price.replace(",", ""))
+            except InvalidOperation:
+                continue
+            if price in seen:
+                continue
+            seen.add(price)
+            prices.append(price)
+        return prices
+
     def _extract_sapphire_stock_status(self, product_data, html, page_text):
-        html_lower = html.lower()
         page_text_lower = page_text.lower()
         has_add_to_bag = "add to bag" in page_text_lower
         has_notify_me = "notify me when available" in page_text_lower
@@ -202,11 +258,140 @@ class SapphireBrandAdapter(GenericBrandAdapter):
         cleaned = re.sub(r"\s+Sapphire\s+PK$", "", cleaned, flags=re.IGNORECASE).strip()
         return cleaned
 
+    def _looks_like_real_title(self, title):
+        if not title:
+            return False
+        lowered = title.lower().strip()
+        if "sapphire" in lowered:
+            return False
+        if re.fullmatch(r"[0-9,\s.]+(?:to)?", lowered):
+            return False
+        if lowered.endswith(" to"):
+            return False
+        if lowered.startswith("rs"):
+            return False
+        if len(title) < 4:
+            return False
+        return True
+
     def _clean_description(self, description):
         cleaned = re.sub(r"\.blink\s*\{.*$", "", description, flags=re.IGNORECASE)
         cleaned = re.sub(r"@keyframes\s+.*$", "", cleaned, flags=re.IGNORECASE)
         cleaned = re.sub(r"\bPrevious\s+Next\b.*$", "", cleaned, flags=re.IGNORECASE)
         return cleaned.strip()
+
+    def _candidate_size_guide_sources(self, html, page_text):
+        candidates = []
+        match = self.size_guide_modal_pattern.search(html)
+        if match:
+            candidates.append(match.group(0))
+        match = self.size_guide_modal_pattern.search(page_text)
+        if match:
+            candidates.append(match.group(0))
+        if "size guide" in page_text.lower():
+            candidates.append(page_text)
+        return candidates
+
+    def _looks_like_broken_size_guide(self, cleaned_text):
+        lowered = cleaned_text.lower()
+        return any(
+            marker in lowered
+            for marker in ("tab-pane", "detail-content-pane", 'id="nav-details', "fade show active")
+        )
+
+    def _strip_size_guide_from_description(self, description):
+        description = re.sub(
+            r"Size Guide\s+[A-Za-z -]{0,80}",
+            "",
+            description,
+            flags=re.IGNORECASE,
+        )
+        description = re.sub(
+            r"INCHES\s+CM\s+Size\s+(?:XXS|XS|S|M|L|XL|XXL).*$",
+            "",
+            description,
+            flags=re.IGNORECASE,
+        )
+        return description.strip()
+
+    def _build_size_guide_html(self, cleaned_text):
+        title_match = self.size_guide_title_pattern.search(cleaned_text)
+        guide_title = title_match.group(1).strip() if title_match else ""
+
+        header_match = self.size_marker_pattern.search(cleaned_text)
+        if not header_match:
+            return ""
+        trailing_text = cleaned_text[header_match.end():]
+        sizes = []
+        remainder_tokens = []
+        collecting_sizes = True
+        for token in trailing_text.split():
+            normalized = token.upper().strip()
+            if collecting_sizes and normalized in {"XXS", "XS", "S", "M", "L", "XL", "XXL"}:
+                sizes.append(normalized)
+                continue
+            collecting_sizes = False
+            remainder_tokens.append(token)
+        if not sizes:
+            return ""
+
+        rows = []
+        values_text = " ".join(remainder_tokens)
+        for label in self.size_guide_labels:
+            pattern = re.compile(
+                rf"{re.escape(label)}\s+((?:[0-9]+(?:\.[0-9]+)?\s+){{{max(len(sizes) - 1, 0)}}}[0-9]+(?:\.[0-9]+)?)",
+                re.IGNORECASE,
+            )
+            match = pattern.search(values_text)
+            if not match:
+                continue
+            values = match.group(1).split()
+            if len(values) != len(sizes):
+                continue
+            rows.append((label, values))
+
+        if not rows:
+            fallback_rows = []
+            for size, measurement in self.size_guide_row_pattern.findall(cleaned_text):
+                fallback_rows.append(f"{size.upper()}: {measurement.strip()}" if measurement else size.upper())
+            if fallback_rows:
+                return "<div class=\"space-y-2 text-sm text-ink/75\">" + "".join(
+                    f"<p>{row}</p>" for row in fallback_rows
+                ) + "</div>"
+            return ""
+
+        header_cells = "".join(
+            f"<th class=\"border border-black/10 px-3 py-3 text-center font-bold text-ink\">{size}</th>"
+            for size in sizes
+        )
+        body_rows = []
+        for label, values in rows:
+            value_cells = "".join(
+                f"<td class=\"border border-black/10 px-3 py-3 text-center text-ink/80\">{value}</td>"
+                for value in values
+            )
+            body_rows.append(
+                "<tr>"
+                f"<th class=\"border border-black/10 bg-[#f7f1ea] px-4 py-3 text-left text-sm font-extrabold uppercase tracking-[0.12em] text-cocoa\">{label}</th>"
+                f"{value_cells}"
+                "</tr>"
+            )
+
+        subtitle = f"<p class=\"text-lg font-bold text-ink\">{guide_title}</p>" if guide_title else ""
+        return (
+            "<div class=\"space-y-5\">"
+            f"{subtitle}"
+            "<div class=\"overflow-x-auto rounded-2xl border border-black/10 bg-white\">"
+            "<table class=\"min-w-full border-collapse text-sm\">"
+            "<thead><tr>"
+            "<th class=\"border border-black/10 bg-[#fdfaf6] px-4 py-3 text-left text-sm font-extrabold uppercase tracking-[0.12em] text-cocoa\">Size</th>"
+            f"{header_cells}"
+            "</tr></thead>"
+            f"<tbody>{''.join(body_rows)}</tbody>"
+            "</table>"
+            "</div>"
+            "</div>"
+        )
 
     def _canonical_image_url(self, image_url):
         image_url = unescape(image_url)

@@ -19,6 +19,7 @@ def sync_product_from_source(product, refresh_details=False):
         product.title = payload.get("title", product.title)
         product.slug = slugify(product.title)[:255]
         product.description = payload.get("description", product.description)
+        product.size_guide = payload.get("size_guide", product.size_guide)
         product.source_product_id = payload.get("source_product_id", product.source_product_id)
         product.source_sku = payload.get("source_sku", product.source_sku)
         product.source_currency = payload.get("source_currency", product.source_currency)
