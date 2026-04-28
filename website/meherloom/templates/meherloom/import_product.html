@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Import Product | Meherloom</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        oat: "#f7f1ea",
+                        ink: "#201516",
+                        clay: "#a64f3c",
+                        cocoa: "#6c3e34",
+                    },
+                    fontFamily: {
+                        sans: ["Plus Jakarta Sans", "sans-serif"],
+                        serif: ["Cormorant Garamond", "serif"],
+                    },
+                },
+            },
+        };
+    </script>
+</head>
+<body class="bg-oat font-sans text-ink">
+    <div class="min-h-screen bg-[linear-gradient(180deg,_#fcf8f3_0%,_#f4ece3_100%)]">
+        <div class="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                    <p class="text-xs font-extrabold uppercase tracking-[0.35em] text-clay">Staff Import</p>
+                    <h1 class="mt-2 font-serif text-5xl leading-none">Import a source product into your catalog.</h1>
+                </div>
+                <a href="{% url 'meherloom:shop' %}" class="text-sm font-bold text-clay">Back to shop</a>
+            </div>
+
+            {% if messages %}
+                <div class="mt-8 space-y-3">
+                    {% for message in messages %}
+                        <div class="rounded-2xl border border-black/5 bg-white px-5 py-4 text-sm font-semibold shadow-sm">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            <div class="mt-8 grid gap-8 lg:grid-cols-[0.9fr_1.1fr]">
+                <section class="rounded-[2rem] border border-black/5 bg-white/80 p-8 shadow-sm">
+                    <h2 class="font-serif text-4xl">New import</h2>
+                    <form method="post" class="mt-6 space-y-5">
+                        {% csrf_token %}
+                        {% for field in form %}
+                            <div>
+                                <label for="{{ field.id_for_label }}" class="mb-2 block text-sm font-extrabold uppercase tracking-[0.18em] text-clay">
+                                    {{ field.label }}
+                                </label>
+                                {{ field.errors }}
+                                {{ field }}
+                            </div>
+                        {% endfor %}
+                        <button type="submit" class="rounded-full bg-cocoa px-6 py-3 text-sm font-bold text-white">
+                            Import Product
+                        </button>
+                    </form>
+                </section>
+
+                <section class="rounded-[2rem] border border-black/5 bg-white/80 p-8 shadow-sm">
+                    <h2 class="font-serif text-4xl">Recent imports</h2>
+                    <div class="mt-6 space-y-4">
+                        {% for product in recent_products %}
+                            <article class="rounded-2xl bg-[#f7f1ea] p-4">
+                                <div class="flex items-start justify-between gap-4">
+                                    <div>
+                                        <p class="text-xs font-extrabold uppercase tracking-[0.18em] text-clay">{{ product.brand.name }}</p>
+                                        <h3 class="mt-2 font-serif text-3xl leading-none">{{ product.title|default:"Pending import" }}</h3>
+                                    </div>
+                                    <span class="rounded-full px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.18em] {% if product.stock_status == 'in_stock' %}bg-emerald-100 text-emerald-700{% elif product.stock_status == 'out_of_stock' %}bg-rose-100 text-rose-700{% else %}bg-amber-100 text-amber-700{% endif %}">
+                                        {{ product.get_stock_status_display }}
+                                    </span>
+                                </div>
+                                <div class="mt-4 flex flex-wrap gap-2">
+                                    {% for variant in product.variants.all|slice:":4" %}
+                                        <span class="rounded-full bg-white px-3 py-1 text-[11px] font-bold uppercase tracking-[0.15em] text-ink/65">
+                                            {{ variant.name }}
+                                        </span>
+                                    {% empty %}
+                                        <span class="text-sm text-ink/50">No variants imported yet.</span>
+                                    {% endfor %}
+                                </div>
+                            </article>
+                        {% empty %}
+                            <p class="text-sm text-ink/60">No imported products yet.</p>
+                        {% endfor %}
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

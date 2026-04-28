@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ product.title }} | Meherloom</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        oat: "#f7f1ea",
+                        ink: "#201516",
+                        clay: "#a64f3c",
+                        cocoa: "#6c3e34",
+                    },
+                    fontFamily: {
+                        sans: ["Plus Jakarta Sans", "sans-serif"],
+                        serif: ["Cormorant Garamond", "serif"],
+                    },
+                },
+            },
+        };
+    </script>
+</head>
+<body class="bg-oat font-sans text-ink">
+    <div class="min-h-screen bg-[linear-gradient(180deg,_#fcf8f3_0%,_#f4ece3_100%)]">
+        <div class="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+            <a href="{% url 'meherloom:index' %}" class="text-sm font-bold text-clay">Back to store</a>
+
+            <section class="mt-6 grid gap-8 lg:grid-cols-[0.95fr_1.05fr]">
+                <div class="space-y-4">
+                    <div class="overflow-hidden rounded-[2rem] border border-black/5 bg-white shadow-sm">
+                        {% if primary_image %}
+                            <img src="{{ primary_image.image_url }}" alt="{{ primary_image.alt_text|default:product.title }}" class="h-[28rem] w-full object-cover">
+                        {% else %}
+                            <div class="flex h-[28rem] items-center justify-center text-ink/40">No imported image yet</div>
+                        {% endif %}
+                    </div>
+
+                    {% if secondary_images %}
+                        <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                            {% for image in secondary_images %}
+                                <div class="overflow-hidden rounded-[1.5rem] border border-black/5 bg-white shadow-sm">
+                                    <img src="{{ image.image_url }}" alt="{{ image.alt_text|default:product.title }}" class="h-36 w-full object-cover">
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+
+                <div class="rounded-[2rem] border border-black/5 bg-white/80 p-8 shadow-sm">
+                    <div class="flex flex-wrap items-start justify-between gap-4">
+                        <div>
+                            <p class="text-xs font-extrabold uppercase tracking-[0.3em] text-clay">{{ product.brand.name }}</p>
+                            <h1 class="mt-3 font-serif text-5xl leading-none">{{ product.title }}</h1>
+                        </div>
+                        <div class="rounded-2xl border border-black/5 bg-[#f7f1ea] px-4 py-3 text-right">
+                            <p class="text-xs font-bold uppercase tracking-[0.18em] text-ink/45">Origin brand</p>
+                            <p class="mt-2 font-serif text-2xl leading-none">{{ product.brand.name }}</p>
+                        </div>
+                    </div>
+
+                    <div class="mt-5 flex flex-wrap items-center gap-3">
+                        <span class="rounded-full px-3 py-1 text-xs font-extrabold uppercase tracking-[0.18em] {% if product.stock_status == 'in_stock' %}bg-emerald-100 text-emerald-700{% elif product.stock_status == 'out_of_stock' %}bg-rose-100 text-rose-700{% else %}bg-amber-100 text-amber-700{% endif %}">
+                            {{ product.get_stock_status_display }}
+                        </span>
+                        <span class="rounded-full bg-black/5 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-ink/70">
+                            {{ product.brand.get_adapter_key_display }}
+                        </span>
+                    </div>
+
+                    <div class="mt-8 grid gap-4 sm:grid-cols-2">
+                        <div class="rounded-2xl bg-[#f7f1ea] p-4">
+                            <p class="text-xs font-bold uppercase tracking-[0.2em] text-ink/45">Your price</p>
+                            <p class="mt-2 text-2xl font-extrabold">{{ product.manual_price }}</p>
+                        </div>
+                        <div class="rounded-2xl bg-[#f7f1ea] p-4">
+                            <p class="text-xs font-bold uppercase tracking-[0.2em] text-ink/45">Source SKU</p>
+                            <p class="mt-2 text-lg font-bold">{{ product.source_sku|default:"Not captured yet" }}</p>
+                        </div>
+                    </div>
+
+                    <div class="mt-8">
+                        <h2 class="text-sm font-extrabold uppercase tracking-[0.25em] text-clay">Imported Details</h2>
+                        {% if description_sections %}
+                            <div class="mt-4 grid gap-4">
+                                {% for section in description_sections %}
+                                    <div class="rounded-2xl border border-black/5 bg-[#fdfaf6] p-5">
+                                        <h3 class="text-sm font-extrabold uppercase tracking-[0.2em] text-cocoa">{{ section.heading }}</h3>
+                                        <p class="mt-3 leading-8 text-ink/70">{{ section.content }}</p>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <p class="mt-3 leading-8 text-ink/70">No description imported yet.</p>
+                        {% endif %}
+                    </div>
+
+                    <div class="mt-8">
+                        <h2 class="text-sm font-extrabold uppercase tracking-[0.25em] text-clay">Available Variants</h2>
+                        <div class="mt-4 grid gap-3">
+                            {% for variant in display_variants %}
+                                <div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-black/10 bg-white px-4 py-3">
+                                    <span class="text-sm font-bold text-ink">{{ variant.label }}</span>
+                                    <span class="rounded-full px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.15em] {% if variant.status_value == 'in_stock' %}bg-emerald-100 text-emerald-700{% elif variant.status_value == 'out_of_stock' %}bg-rose-100 text-rose-700{% else %}bg-amber-100 text-amber-700{% endif %}">
+                                        {{ variant.status }}
+                                    </span>
+                                </div>
+                            {% empty %}
+                                <p class="text-sm text-ink/60">No variant data imported yet.</p>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            {% if related_products %}
+                <section class="mt-12">
+                    <h2 class="font-serif text-4xl">More From {{ product.brand.name }}</h2>
+                    <div class="mt-6 grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
+                        {% for item in related_products %}
+                            <article class="rounded-[2rem] border border-black/5 bg-white p-5 shadow-sm">
+                                <h3 class="font-serif text-3xl leading-none">{{ item.title }}</h3>
+                                <p class="mt-3 text-sm leading-7 text-ink/65">{{ item.description|truncatechars:80 }}</p>
+                                <div class="mt-4 flex items-center justify-between">
+                                    <span class="font-extrabold">{{ item.manual_price }}</span>
+                                    <a href="{% url 'meherloom:product_detail' item.pk %}" class="text-sm font-bold text-clay">View</a>
+                                </div>
+                            </article>
+                        {% endfor %}
+                    </div>
+                </section>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

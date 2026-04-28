@@ -1,0 +1,80 @@
+BRAND_SEED_DATA = [
+    {
+        "name": "Maria.B.",
+        "website_url": "https://www.mariabbd.com/",
+        "adapter_key": "shopify",
+        "notes": "Observed Shopify storefront patterns and product variant JSON. Use the Shopify adapter.",
+    },
+    {
+        "name": "Sana Safinaz",
+        "website_url": "https://sanasafinaz.com/",
+        "adapter_key": "shopify",
+        "notes": "Storefront exposes Shopify-linked flows and product pages fit a Shopify adapter strategy.",
+    },
+    {
+        "name": "SAPPHIRE",
+        "website_url": "https://pk.sapphireonline.pk/",
+        "adapter_key": "sapphire",
+        "notes": "Official retail storefront. Product pages are JS-heavy and use custom page-state patterns, so use the SAPPHIRE adapter.",
+    },
+    {
+        "name": "Khaadi",
+        "website_url": "https://www.khaadi.com/",
+        "adapter_key": "generic",
+        "notes": "Main site is JS-heavy with country routing. Likely needs a dedicated brand adapter after product-page inspection.",
+    },
+    {
+        "name": "Gul Ahmed Ideas",
+        "website_url": "https://www.gulahmedshop.com/",
+        "adapter_key": "generic",
+        "notes": "Official Ideas by Gul Ahmed online store.",
+    },
+    {
+        "name": "Asim Jofa",
+        "website_url": "https://global.asimjofa.com/",
+        "adapter_key": "generic",
+        "notes": "Global storefront found; locale handling may need separate Pakistan product URLs.",
+    },
+    {
+        "name": "Afrozeh",
+        "website_url": "https://www.afrozeh.com/",
+        "adapter_key": "generic",
+        "notes": "Luxury storefront appears compatible with common JSON/embedded product patterns.",
+    },
+    {
+        "name": "Elan",
+        "website_url": "https://elan.pk/",
+        "adapter_key": "generic",
+        "notes": "Official Elan storefront.",
+    },
+    {
+        "name": "Crimson",
+        "website_url": "https://www.crimson.com.pk/",
+        "adapter_key": "generic",
+        "notes": "Official Crimson storefront.",
+    },
+    {
+        "name": "Agha Noor",
+        "website_url": "https://pk.aghanoorofficial.com/",
+        "adapter_key": "agha_noor",
+        "notes": "Product pages expose stable size/color/product-variant UI and add-to-cart state. Use the Agha Noor adapter.",
+    },
+    {
+        "name": "Beechtree",
+        "website_url": "https://beechtree.pk/",
+        "adapter_key": "generic",
+        "notes": "Official Beechtree storefront.",
+    },
+    {
+        "name": "Limelight",
+        "website_url": "https://www.limelight.pk/",
+        "adapter_key": "shopify",
+        "notes": "Powered by Shopify according to storefront output; strong candidate for Shopify adapter reuse.",
+    },
+    {
+        "name": "Cross Stitch",
+        "website_url": "https://www.crossstitch.pk/",
+        "adapter_key": "generic",
+        "notes": "Official Cross Stitch storefront.",
+    },
+]

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shop | Meherloom</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        oat: "#f7f1ea",
+                        ink: "#201516",
+                        clay: "#a64f3c",
+                        cocoa: "#6c3e34",
+                    },
+                    fontFamily: {
+                        sans: ["Plus Jakarta Sans", "sans-serif"],
+                        serif: ["Cormorant Garamond", "serif"],
+                    },
+                    boxShadow: {
+                        soft: "0 20px 60px rgba(52, 30, 26, 0.10)",
+                    },
+                },
+            },
+        };
+    </script>
+</head>
+<body class="bg-oat font-sans text-ink">
+    <div class="min-h-screen bg-[linear-gradient(180deg,_#fcf8f3_0%,_#f4ece3_100%)]">
+        <div class="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                    <p class="text-xs font-extrabold uppercase tracking-[0.35em] text-clay">Shop</p>
+                    <h1 class="mt-2 font-serif text-5xl leading-none">Imported catalog, ready for preorder.</h1>
+                </div>
+                <a href="{% url 'meherloom:index' %}" class="text-sm font-bold text-clay">Back home</a>
+            </div>
+
+            <div class="mt-8 flex flex-wrap gap-3">
+                {% for brand in active_brands %}
+                    <span class="rounded-full border border-black/10 bg-white px-4 py-2 text-sm font-bold">
+                        {{ brand.name }}
+                    </span>
+                {% endfor %}
+            </div>
+
+            <div class="mt-8 grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
+                {% for product in products %}
+                    <article class="group overflow-hidden rounded-[2rem] border border-black/5 bg-white shadow-soft transition duration-300 hover:-translate-y-1">
+                        <div class="h-72 bg-gradient-to-br from-[#f5e8df] via-[#ead7ca] to-[#d3af9a] p-5">
+                            <div class="flex items-start justify-between gap-3">
+                                <span class="rounded-full bg-white/85 px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.24em] text-clay">
+                                    {{ product.brand.name }}
+                                </span>
+                                <span class="rounded-full px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.18em] {% if product.stock_status == 'in_stock' %}bg-emerald-100 text-emerald-700{% elif product.stock_status == 'out_of_stock' %}bg-rose-100 text-rose-700{% else %}bg-amber-100 text-amber-700{% endif %}">
+                                    {{ product.get_stock_status_display }}
+                                </span>
+                            </div>
+                            <div class="mt-24">
+                                <p class="text-sm font-semibold uppercase tracking-[0.22em] text-cocoa/60">
+                                    {{ product.source_sku|default:"Imported Product" }}
+                                </p>
+                                <h2 class="mt-2 font-serif text-4xl leading-none text-ink">{{ product.title|default:"Untitled Product" }}</h2>
+                            </div>
+                        </div>
+                        <div class="p-5">
+                            <p class="min-h-[4.5rem] text-sm leading-7 text-ink/65">{{ product.description|truncatechars:110|default:"Imported product details will appear here after sync." }}</p>
+                            <div class="mt-4 flex flex-wrap gap-2">
+                                {% for variant in product.variants.all|slice:":3" %}
+                                    <span class="rounded-full bg-black/5 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.15em] text-ink/65">
+                                        {{ variant.name }}
+                                    </span>
+                                {% endfor %}
+                                {% if product.variants.count > 3 %}
+                                    <span class="rounded-full bg-black/5 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.15em] text-ink/65">
+                                        +{{ product.variants.count|add:"-3" }} more
+                                    </span>
+                                {% endif %}
+                            </div>
+                            <div class="mt-5 flex items-center justify-between gap-4">
+                                <span class="text-xl font-extrabold text-ink">{{ product.manual_price }}</span>
+                                <a href="{% url 'meherloom:product_detail' product.pk %}" class="rounded-full border border-ink/10 px-4 py-2 text-sm font-bold text-ink transition group-hover:border-clay group-hover:text-clay">
+                                    View Product
+                                </a>
+                            </div>
+                        </div>
+                    </article>
+                {% empty %}
+                    <div class="rounded-[2rem] border border-dashed border-ink/15 bg-white/70 p-10 text-center text-ink/65 sm:col-span-2 xl:col-span-4">
+                        No imported products are published yet.
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</body>
+</html>
