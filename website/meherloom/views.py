@@ -13,6 +13,8 @@ from .services.catalog import import_product_from_source
 
 
 PRIMARY_DETAIL_SECTIONS = ("Shirt", "Dupatta", "Trouser", "Culottes")
+NARRATIVE_MARKER_PATTERN = r"(Make|Crafted|Elevate|Discover|Step|Designed|This|Our|A|Revamp|Perfect)"
+META_MARKER_PATTERN = r"(Model Height:|Model Wears Size:|Model Wears:|View Size Chart)"
 PRIMARY_SECTION_PATTERN = re.compile(
     r"\b(Shirt|Dupatta|Trouser|Culottes)\b\s+(.*?)(?=\b(?:Shirt|Dupatta|Trouser|Culottes)\b\s+(?:Printed|Embroidered|Dyed|Digital|Plain|Cotton|Lawn|Blended|Voile|Chiffon|Organza|Khaddar|Colour:|Fabric:)|$)",
     re.IGNORECASE | re.DOTALL,
@@ -248,8 +250,11 @@ def _split_product_description(description):
         description_lines.extend(trailing_description_lines)
     if description_text:
         description_lines.append(description_text)
+    description_lines, meta_lines = _split_description_and_meta(description_lines)
     if description_lines:
         sections.append({"heading": "Description", "lines": description_lines})
+    if meta_lines:
+        sections.append({"heading": "Product Notes", "lines": meta_lines})
     if note_text:
         sections.append({"heading": "Note", "lines": [note_text]})
     return sections
@@ -336,23 +341,25 @@ def _split_section_lines(content):
 
 
 def _split_detail_line_and_overflow(line):
-    if line.startswith("Colour:"):
-        match = re.match(r"^(Colour:\s*[A-Za-z/& -]+?)(\s+[A-Z].*)$", line)
-        if match and _looks_like_narrative_text(match.group(2).strip()):
-            return match.group(1).strip(), match.group(2).strip()
-    if line.startswith("Fabric:"):
-        match = re.match(r"^(Fabric:\s*[A-Za-z/& -]+?)(\s+[A-Z].*)$", line)
-        if match and _looks_like_narrative_text(match.group(2).strip()):
-            return match.group(1).strip(), match.group(2).strip()
+    for prefix in ("Colour:", "Fabric:"):
+        if line.startswith(prefix):
+            marker_match = re.search(rf"\b{NARRATIVE_MARKER_PATTERN}\b", line)
+            if not marker_match:
+                marker_match = re.search(META_MARKER_PATTERN, line)
+            if marker_match:
+                detail_line = line[: marker_match.start()].strip()
+                overflow_line = line[marker_match.start() :].strip()
+                if detail_line and overflow_line:
+                    return detail_line, overflow_line
     return line, ""
 
 
 def _looks_like_narrative_text(text):
-    return bool(re.match(r"^(Make|Crafted|Elevate|Discover|Step|Designed|This|Our|A)\b", text))
+    return bool(re.match(rf"^{NARRATIVE_MARKER_PATTERN}\b", text))
 
 
 def _extract_marketing_description(text):
-    match = re.search(r"\b(Make|Revamp|Elevate|Crafted|Discover|Step|Designed|This)\b.*$", text)
+    match = re.search(rf"\b{NARRATIVE_MARKER_PATTERN}\b.*$", text)
     if not match:
         return text, ""
     return text[: match.start()].strip(), text[match.start():].strip()
@@ -368,3 +375,41 @@ def _infer_missing_first_section(text):
         if " Culottes " in f" {cleaned} ":
             return f"Shirt {cleaned}"
     return cleaned
+
+
+def _split_description_and_meta(lines):
+    description_lines = []
+    meta_lines = []
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        if re.match(rf"^{META_MARKER_PATTERN}", line):
+            meta_lines.extend(_split_model_meta(line))
+            continue
+        match = re.search(META_MARKER_PATTERN, line)
+        if match:
+            description_part = line[: match.start()].strip()
+            if description_part:
+                description_lines.append(description_part)
+            meta_text = line[match.start() :].strip()
+            if meta_text:
+                meta_lines.extend(_split_model_meta(meta_text))
+        else:
+            description_lines.append(line)
+    return description_lines, meta_lines
+
+
+def _split_model_meta(text):
+    normalized = re.sub(r"\s+", " ", text).strip()
+    if not normalized:
+        return []
+    meta_lines = []
+    matches = list(re.finditer(META_MARKER_PATTERN, normalized))
+    for index, match in enumerate(matches):
+        start = match.start()
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(normalized)
+        value = normalized[start:end].strip()
+        if value:
+            meta_lines.append(value)
+    return meta_lines

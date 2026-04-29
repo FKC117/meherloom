@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 from datetime import timedelta
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from django.core.validators import MinValueValidator
 from django.db import models
@@ -15,6 +18,9 @@ class TimeStampedModel(models.Model):
 
 
 class Brand(TimeStampedModel):
+    if TYPE_CHECKING:
+        products: models.Manager[Product]
+
     class Adapter(models.TextChoices):
         GENERIC = "generic", "Generic JSON-LD scraper"
         SHOPIFY = "shopify", "Shopify product scraper"
@@ -33,7 +39,7 @@ class Brand(TimeStampedModel):
     request_timeout = models.PositiveIntegerField(default=20)
     notes = models.TextField(blank=True)
 
-    class Meta:
+    class Meta(TimeStampedModel.Meta):
         ordering = ["name"]
 
     def __str__(self):
@@ -41,6 +47,11 @@ class Brand(TimeStampedModel):
 
 
 class Product(TimeStampedModel):
+    if TYPE_CHECKING:
+        images: models.Manager[ProductImage]
+        variants: models.Manager[ProductVariant]
+        order_items: models.Manager[OrderItem]
+
     class SyncStatus(models.TextChoices):
         DRAFT = "draft", "Draft"
         ACTIVE = "active", "Active"
@@ -94,7 +105,7 @@ class Product(TimeStampedModel):
     sync_error = models.TextField(blank=True)
     is_published = models.BooleanField(default=True)
 
-    class Meta:
+    class Meta(TimeStampedModel.Meta):
         ordering = ["-updated_at"]
 
     def __str__(self):
@@ -118,7 +129,7 @@ class ProductImage(TimeStampedModel):
     alt_text = models.CharField(max_length=255, blank=True)
     sort_order = models.PositiveIntegerField(default=0)
 
-    class Meta:
+    class Meta(TimeStampedModel.Meta):
         ordering = ["sort_order", "id"]
 
     def __str__(self):
@@ -126,6 +137,9 @@ class ProductImage(TimeStampedModel):
 
 
 class ProductVariant(TimeStampedModel):
+    if TYPE_CHECKING:
+        order_items: models.Manager[OrderItem]
+
     class StockStatus(models.TextChoices):
         IN_STOCK = "in_stock", "In stock"
         OUT_OF_STOCK = "out_of_stock", "Out of stock"
@@ -146,7 +160,7 @@ class ProductVariant(TimeStampedModel):
     )
     stock_quantity = models.PositiveIntegerField(null=True, blank=True)
 
-    class Meta:
+    class Meta(TimeStampedModel.Meta):
         unique_together = ("product", "name")
         ordering = ["name"]
 
@@ -155,6 +169,9 @@ class ProductVariant(TimeStampedModel):
 
 
 class Order(TimeStampedModel):
+    if TYPE_CHECKING:
+        items: models.Manager[OrderItem]
+
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"
         CONFIRMED = "confirmed", "Confirmed"
@@ -172,7 +189,7 @@ class Order(TimeStampedModel):
     rejection_reason = models.TextField(blank=True)
     source_stock_checked_at = models.DateTimeField(null=True, blank=True)
 
-    class Meta:
+    class Meta(TimeStampedModel.Meta):
         ordering = ["-created_at"]
 
     def __str__(self):
@@ -204,7 +221,7 @@ class OrderItem(TimeStampedModel):
     quantity = models.PositiveIntegerField(default=1)
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
 
-    class Meta:
+    class Meta(TimeStampedModel.Meta):
         ordering = ["id"]
 
     def __str__(self):

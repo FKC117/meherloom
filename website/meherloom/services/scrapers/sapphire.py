@@ -8,6 +8,7 @@ from meherloom.services.scrapers.generic import GenericBrandAdapter
 
 
 class SapphireBrandAdapter(GenericBrandAdapter):
+    size_variant_tokens = {"XXS", "XS", "S", "M", "L", "XL", "XXL"}
     title_heading_pattern = re.compile(r"<h1[^>]*>(.*?)</h1>", re.IGNORECASE | re.DOTALL)
     sku_pattern = re.compile(r"SKU:\s*([A-Z0-9_-]+)", re.IGNORECASE)
     price_pattern = re.compile(r"Rs\.\s*([0-9,]+(?:\.[0-9]{1,2})?)", re.IGNORECASE)
@@ -47,10 +48,14 @@ class SapphireBrandAdapter(GenericBrandAdapter):
         product_data = self._extract_product_from_json_ld(html) or {}
         meta = self._extract_meta(html)
         page_text = self._normalized_page_text(html)
+        page_family = self._detect_page_family(product.source_url, page_text)
+
+        description = self._extract_description(product_data, meta, html, page_text)
+        description = self._normalize_description_for_family(description, page_family)
 
         payload = {
-            "title": self._extract_title(product_data, meta, html, page_text),
-            "description": self._extract_description(product_data, meta, html, page_text),
+            "title": self._extract_title(product_data, meta, html, page_text, page_family),
+            "description": description,
             "size_guide": self._extract_size_guide(html, page_text),
             "source_product_id": self._extract_product_id(product_data, product.source_url),
             "source_sku": self._extract_sku(product_data, html, page_text),
@@ -59,30 +64,30 @@ class SapphireBrandAdapter(GenericBrandAdapter):
             "stock_status": self._extract_sapphire_stock_status(product_data, html, page_text),
             "stock_quantity": self._extract_stock_quantity(product_data),
             "image_urls": self._extract_sapphire_images(product_data, meta, html),
-            "variants": self._extract_sapphire_variants(product_data, html, page_text),
+            "variants": self._extract_sapphire_variants(product_data, html, page_text, page_family),
         }
 
         if not payload["source_product_id"]:
             payload["source_product_id"] = payload["source_sku"]
         return payload
 
-    def _extract_title(self, product_data, meta, html, page_text):
-        text_match = self.text_title_sku_pattern.search(page_text)
-        if text_match:
-            candidate = self._clean_title(text_match.group(1))
-            if self._looks_like_real_title(candidate):
-                return candidate
-
+    def _extract_title(self, product_data, meta, html, page_text, page_family):
         heading_matches = self.title_heading_pattern.findall(html)
         for heading in heading_matches:
             title = self._strip_html(heading)
-            cleaned = self._clean_title(title)
+            cleaned = self._clean_title(title, page_family)
             if self._looks_like_real_title(cleaned):
                 return cleaned
 
+        text_match = self.text_title_sku_pattern.search(page_text)
+        if text_match:
+            candidate = self._clean_title(text_match.group(1), page_family)
+            if self._looks_like_real_title(candidate):
+                return candidate
+
         title = product_data.get("name") or meta.get("og:title") or meta.get("title") or ""
         if title:
-            cleaned = self._clean_title(title)
+            cleaned = self._clean_title(title, page_family)
             if self._looks_like_real_title(cleaned):
                 return cleaned
         return ""
@@ -190,7 +195,7 @@ class SapphireBrandAdapter(GenericBrandAdapter):
             return Product.StockStatus.IN_STOCK
         return Product.StockStatus.UNKNOWN
 
-    def _extract_sapphire_variants(self, product_data, html, page_text):
+    def _extract_sapphire_variants(self, product_data, html, page_text, page_family):
         variants = self._extract_variants(product_data)
         if variants:
             return variants
@@ -207,6 +212,8 @@ class SapphireBrandAdapter(GenericBrandAdapter):
         for size in self.size_token_pattern.findall(sizes_block):
             cleaned = size.strip().upper()
             if cleaned in {"INPUT", "BUTTON"} or cleaned in seen:
+                continue
+            if cleaned not in self.size_variant_tokens:
                 continue
             seen.add(cleaned)
             extracted.append(
@@ -246,8 +253,15 @@ class SapphireBrandAdapter(GenericBrandAdapter):
         text = self._strip_html(html)
         return re.sub(r"\s+", " ", text).strip()
 
-    def _clean_title(self, title):
-        cleaned = re.sub(r"^.*?Home\s+Woman\s+Unstitched\s+", "", title, flags=re.IGNORECASE).strip()
+    def _clean_title(self, title, page_family="generic"):
+        cleaned = re.sub(r"^(?:Get the look\s+)+", "", title, flags=re.IGNORECASE).strip()
+        cleaned = re.sub(
+            r"^.*?Home\s+Woman\s+(?:Unstitched|WEST|Western Wear|Ready to Wear|Modest Wear|Accessories)\s+",
+            "",
+            cleaned,
+            flags=re.IGNORECASE,
+        ).strip()
+        cleaned = re.sub(r"^.*?Home\s+Woman\s+", "", cleaned, flags=re.IGNORECASE).strip()
         duplicate_match = re.search(
             r"((?:\d+\s+Piece\s*-\s*[A-Za-z][A-Za-z ]+Suit))(?:\s+\1)+",
             cleaned,
@@ -255,6 +269,8 @@ class SapphireBrandAdapter(GenericBrandAdapter):
         )
         if duplicate_match:
             cleaned = duplicate_match.group(1)
+        cleaned = self._collapse_duplicate_title(cleaned)
+        cleaned = re.sub(r"\b(?:Woman|WEST|Modest Wear|Accessories)\b\s+", "", cleaned, flags=re.IGNORECASE).strip()
         cleaned = re.sub(r"\s+Sapphire\s+PK$", "", cleaned, flags=re.IGNORECASE).strip()
         return cleaned
 
@@ -263,6 +279,10 @@ class SapphireBrandAdapter(GenericBrandAdapter):
             return False
         lowered = title.lower().strip()
         if "sapphire" in lowered:
+            return False
+        if "get the look" in lowered:
+            return False
+        if "home woman" in lowered:
             return False
         if re.fullmatch(r"[0-9,\s.]+(?:to)?", lowered):
             return False
@@ -312,7 +332,84 @@ class SapphireBrandAdapter(GenericBrandAdapter):
             description,
             flags=re.IGNORECASE,
         )
+        description = re.sub(
+            r"View Size Chart\s+[A-Za-z -]{0,80}\s+CM\s+INCHES\s+Size\s+(?:XXS|XS|S|M|L|XL|XXL).*$",
+            "",
+            description,
+            flags=re.IGNORECASE,
+        )
         return description.strip()
+
+    def _detect_page_family(self, source_url, page_text):
+        path = urlparse(source_url).path.lower()
+        if "/collections/unstitched/" in path:
+            return "unstitched"
+        if "/collections/western-wear/" in path:
+            return "western_bottoms"
+        if "/collections/modest-wear/" in path:
+            return "modest_wear"
+        if "/collections/accessories/" in path:
+            return "accessories"
+        if "/collections/ready-to-wear" in path:
+            return "ready_to_wear"
+        if "culottes" in page_text.lower() or "shirt" in page_text.lower():
+            return "ready_to_wear"
+        return "generic"
+
+    def _normalize_description_for_family(self, description, page_family):
+        cleaned = re.sub(r"\s+", " ", description or "").strip()
+        if not cleaned:
+            return ""
+
+        cleaned = self._strip_size_guide_from_description(cleaned)
+
+        if cleaned.startswith(":"):
+            cleaned = cleaned.lstrip(": ").strip()
+            if cleaned and not cleaned.lower().startswith("colour:"):
+                colour_match = re.match(r"^([A-Za-z/& -]+?)\s+(Fabric:.*)$", cleaned)
+                if colour_match:
+                    cleaned = f"Colour: {colour_match.group(1).strip()} {colour_match.group(2).strip()}"
+
+        if page_family == "western_bottoms":
+            if cleaned.startswith("Colour:"):
+                cleaned = f"Trouser {cleaned}"
+        elif page_family == "modest_wear":
+            if cleaned.startswith("Colour:"):
+                cleaned = f"Abaya {cleaned}"
+        elif page_family == "accessories":
+            cleaned = re.sub(r"Linning:", "Lining:", cleaned, flags=re.IGNORECASE)
+            cleaned = re.sub(r"\bMeasurement\s*:\s*", "Measurement: ", cleaned, flags=re.IGNORECASE)
+        elif page_family == "ready_to_wear":
+            shirt_dupatta_match = re.search(
+                r"Shirt\s*&\s*Dupatta\s+Colour:\s*([A-Za-z/& -]+?)\s+Fabric:\s*([A-Za-z/& -]+?)(?=\s+(?:Wide\s+)?Culottes\b|\s+Trouser\b|\s+Step\b|\s+Make\b|\s+Perfect\b|\s+Revamp\b|$)",
+                cleaned,
+                flags=re.IGNORECASE,
+            )
+            if shirt_dupatta_match:
+                colour = shirt_dupatta_match.group(1).strip()
+                fabric = shirt_dupatta_match.group(2).strip()
+                replacement = f"Shirt Colour: {colour} Fabric: {fabric} Dupatta Colour: {colour} Fabric: {fabric}"
+                cleaned = (
+                    cleaned[: shirt_dupatta_match.start()]
+                    + replacement
+                    + cleaned[shirt_dupatta_match.end() :]
+                )
+            cleaned = re.sub(r"^&\s+", "", cleaned)
+            cleaned = re.sub(r"\bWide Culottes\b", "Culottes", cleaned, flags=re.IGNORECASE)
+            cleaned = re.sub(r"\s+Dupatta\s+Colour:", " Dupatta Colour:", cleaned, flags=re.IGNORECASE)
+
+        return cleaned.strip()
+
+    def _collapse_duplicate_title(self, title):
+        tokens = title.split()
+        if len(tokens) >= 4 and len(tokens) % 2 == 0:
+            midpoint = len(tokens) // 2
+            if [token.lower() for token in tokens[:midpoint]] == [token.lower() for token in tokens[midpoint:]]:
+                return " ".join(tokens[:midpoint])
+        repeated_phrase = re.match(r"^(.{4,120}?)\s+\1$", title, flags=re.IGNORECASE)
+        if repeated_phrase:
+            return repeated_phrase.group(1).strip()
+        return title
 
     def _build_size_guide_html(self, cleaned_text):
         title_match = self.size_guide_title_pattern.search(cleaned_text)

@@ -29,7 +29,7 @@
 </head>
 <body class="bg-oat font-sans text-ink">
     <div class="min-h-screen bg-[linear-gradient(180deg,_#fcf8f3_0%,_#f4ece3_100%)]">
-        <div class="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+        <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
             <a href="{% url 'meherloom:index' %}" class="text-sm font-bold text-clay">Back to store</a>
 
             <section class="mt-6 grid gap-8 lg:grid-cols-[0.95fr_1.05fr]">
@@ -49,16 +49,16 @@
                                     id="gallery-main-image"
                                     src="{{ primary_image.image_url }}"
                                     alt="{{ primary_image.alt_text|default:product.title }}"
-                                    class="h-[28rem] w-full object-cover transition duration-300 hover:scale-[1.02]"
+                                    class="h-[22rem] w-full object-cover transition duration-300 hover:scale-[1.02] sm:h-[28rem]"
                                 >
                             </button>
                         {% else %}
-                            <div class="flex h-[28rem] items-center justify-center text-ink/40">No imported image yet</div>
+                            <div class="flex h-[22rem] items-center justify-center text-ink/40 sm:h-[28rem]">No imported image yet</div>
                         {% endif %}
                     </div>
 
                     {% if primary_image or secondary_images %}
-                        <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                        <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
                             {% if primary_image %}
                                 <button
                                     type="button"
@@ -68,7 +68,7 @@
                                     onclick="window.meherloomSwapImage('{{ primary_image.image_url|escapejs }}', '{{ primary_image.alt_text|default:product.title|escapejs }}', this)"
                                     aria-label="Show image 1"
                                 >
-                                    <img src="{{ primary_image.image_url }}" alt="{{ primary_image.alt_text|default:product.title }}" class="h-36 w-full object-cover">
+                                    <img src="{{ primary_image.image_url }}" alt="{{ primary_image.alt_text|default:product.title }}" class="h-28 w-full object-cover sm:h-36">
                                 </button>
                             {% endif %}
                             {% for image in secondary_images %}
@@ -80,20 +80,20 @@
                                     onclick="window.meherloomSwapImage('{{ image.image_url|escapejs }}', '{{ image.alt_text|default:product.title|escapejs }}', this)"
                                     aria-label="Show another product image"
                                 >
-                                    <img src="{{ image.image_url }}" alt="{{ image.alt_text|default:product.title }}" class="h-36 w-full object-cover">
+                                    <img src="{{ image.image_url }}" alt="{{ image.alt_text|default:product.title }}" class="h-28 w-full object-cover sm:h-36">
                                 </button>
                             {% endfor %}
                         </div>
                     {% endif %}
                 </div>
 
-                <div class="rounded-[2rem] border border-black/5 bg-white/80 p-8 shadow-sm">
-                    <div class="flex flex-wrap items-start justify-between gap-4">
+                <div class="rounded-[2rem] border border-black/5 bg-white/80 p-5 shadow-sm sm:p-8">
+                    <div class="flex flex-col gap-5 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
                         <div>
                             <p class="text-xs font-extrabold uppercase tracking-[0.3em] text-clay">{{ product.brand.name }}</p>
-                            <h1 class="mt-3 font-serif text-5xl leading-none">{{ product.title }}</h1>
+                            <h1 class="mt-3 font-serif text-4xl leading-none sm:text-5xl">{{ product.title }}</h1>
                         </div>
-                        <div class="rounded-2xl border border-black/5 bg-[#f7f1ea] px-4 py-3 text-right">
+                        <div class="rounded-2xl border border-black/5 bg-[#f7f1ea] px-4 py-3 text-left sm:text-right">
                             <p class="text-xs font-bold uppercase tracking-[0.18em] text-ink/45">Origin brand</p>
                             <p class="mt-2 font-serif text-2xl leading-none">{{ product.brand.name }}</p>
                         </div>
@@ -134,7 +134,7 @@
                                 <button
                                     type="button"
                                     id="size-guide-trigger"
-                                    class="rounded-full border border-ink/10 px-4 py-2 text-sm font-bold text-ink transition hover:border-clay hover:text-clay"
+                                    class="rounded-full border border-ink/10 px-4 py-2 text-sm font-bold text-ink transition hover:border-clay hover:text-clay sm:self-auto"
                                     onclick="window.meherloomOpenSizeGuide()"
                                 >
                                     View Size Guide
@@ -167,7 +167,7 @@
                         <h2 class="text-sm font-extrabold uppercase tracking-[0.25em] text-clay">Available Variants</h2>
                         <div class="mt-4 grid gap-3">
                             {% for variant in display_variants %}
-                                <div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-black/10 bg-white px-4 py-3">
+                                <div class="flex flex-col gap-2 rounded-2xl border border-black/10 bg-white px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-3">
                                     <span class="text-sm font-bold text-ink">{{ variant.label }}</span>
                                     <span class="rounded-full px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.15em] {% if variant.status_value == 'in_stock' %}bg-emerald-100 text-emerald-700{% elif variant.status_value == 'out_of_stock' %}bg-rose-100 text-rose-700{% else %}bg-amber-100 text-amber-700{% endif %}">
                                         {{ variant.status }}
@@ -183,11 +183,11 @@
 
             {% if related_products %}
                 <section class="mt-12">
-                    <h2 class="font-serif text-4xl">More From {{ product.brand.name }}</h2>
+                    <h2 class="font-serif text-3xl sm:text-4xl">More From {{ product.brand.name }}</h2>
                     <div class="mt-6 grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
                         {% for item in related_products %}
                             <article class="rounded-[2rem] border border-black/5 bg-white p-5 shadow-sm">
-                                <h3 class="font-serif text-3xl leading-none">{{ item.title }}</h3>
+                                <h3 class="font-serif text-2xl leading-none sm:text-3xl">{{ item.title }}</h3>
                                 <p class="mt-3 text-sm leading-7 text-ink/65">{{ item.description|truncatechars:80 }}</p>
                                 <div class="mt-4 flex items-center justify-between">
                                     <span class="font-extrabold">&#2547;{{ item.manual_price|floatformat:2 }}</span>
@@ -201,13 +201,13 @@
         </div>
     </div>
 
-    <div id="image-lightbox" class="fixed inset-0 z-50 hidden bg-black/80 px-4 py-8">
-        <div class="mx-auto flex h-full max-w-6xl items-center justify-center">
-            <div class="absolute left-6 top-6 flex flex-wrap gap-3">
+        <div id="image-lightbox" class="fixed inset-0 z-50 hidden bg-black/80 px-3 py-6 sm:px-4 sm:py-8">
+            <div class="mx-auto flex h-full max-w-6xl items-center justify-center">
+            <div class="absolute left-3 top-3 flex flex-wrap gap-2 sm:left-6 sm:top-6 sm:gap-3">
                 <button
                     type="button"
                     id="lightbox-zoom-in"
-                    class="rounded-full bg-white/10 px-4 py-2 text-sm font-bold text-white backdrop-blur"
+                    class="rounded-full bg-white/10 px-3 py-2 text-xs font-bold text-white backdrop-blur sm:px-4 sm:text-sm"
                     onclick="window.meherloomZoomIn()"
                 >
                     Zoom In
@@ -215,7 +215,7 @@
                 <button
                     type="button"
                     id="lightbox-zoom-out"
-                    class="rounded-full bg-white/10 px-4 py-2 text-sm font-bold text-white backdrop-blur"
+                    class="rounded-full bg-white/10 px-3 py-2 text-xs font-bold text-white backdrop-blur sm:px-4 sm:text-sm"
                     onclick="window.meherloomZoomOut()"
                 >
                     Zoom Out
@@ -223,7 +223,7 @@
                 <button
                     type="button"
                     id="lightbox-zoom-reset"
-                    class="rounded-full bg-white/10 px-4 py-2 text-sm font-bold text-white backdrop-blur"
+                    class="rounded-full bg-white/10 px-3 py-2 text-xs font-bold text-white backdrop-blur sm:px-4 sm:text-sm"
                     onclick="window.meherloomResetZoom()"
                 >
                     Reset
@@ -232,7 +232,7 @@
             <button
                 type="button"
                 id="lightbox-close"
-                class="absolute right-6 top-6 rounded-full bg-white/10 px-4 py-2 text-sm font-bold text-white backdrop-blur"
+                class="absolute right-3 top-3 rounded-full bg-white/10 px-3 py-2 text-xs font-bold text-white backdrop-blur sm:right-6 sm:top-6 sm:px-4 sm:text-sm"
                 onclick="window.meherloomCloseLightbox()"
                 aria-label="Close image preview"
             >
@@ -249,18 +249,18 @@
     </div>
 
     {% if product.size_guide or size_guide_image_url %}
-        <div id="size-guide-modal" class="fixed inset-0 z-50 hidden bg-black/70 px-4 py-8">
+        <div id="size-guide-modal" class="fixed inset-0 z-50 hidden bg-black/70 px-3 py-4 sm:px-4 sm:py-8">
             <div class="mx-auto flex h-full max-w-3xl items-center justify-center">
-                <div class="w-full rounded-[2rem] bg-white p-6 shadow-2xl sm:p-8">
+                <div class="max-h-full w-full overflow-y-auto rounded-[2rem] bg-white p-5 shadow-2xl sm:p-8">
                     <div class="flex items-start justify-between gap-4">
                         <div>
                             <p class="text-xs font-extrabold uppercase tracking-[0.25em] text-clay">Size Guide</p>
-                            <h2 class="mt-2 font-serif text-4xl leading-none text-ink">{{ product.brand.name }}</h2>
+                            <h2 class="mt-2 font-serif text-3xl leading-none text-ink sm:text-4xl">{{ product.brand.name }}</h2>
                         </div>
                         <button
                             type="button"
                             id="size-guide-close"
-                            class="rounded-full border border-ink/10 px-4 py-2 text-sm font-bold text-ink transition hover:border-clay hover:text-clay"
+                            class="rounded-full border border-ink/10 px-3 py-2 text-xs font-bold text-ink transition hover:border-clay hover:text-clay sm:px-4 sm:text-sm"
                             onclick="window.meherloomCloseSizeGuide()"
                         >
                             Close
@@ -271,7 +271,7 @@
                             <img
                                 src="{{ size_guide_image_url }}"
                                 alt="{{ product.title }} size guide"
-                                class="mx-auto max-h-[75vh] w-full rounded-xl object-contain"
+                                class="mx-auto max-h-[70vh] w-full rounded-xl object-contain sm:max-h-[75vh]"
                             >
                         {% elif size_guide_html %}
                             {{ size_guide_html|safe }}

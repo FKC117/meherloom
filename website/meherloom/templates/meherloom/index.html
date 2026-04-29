@@ -35,12 +35,12 @@
 <body class="bg-oat font-sans text-ink">
     <div class="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(241,223,212,0.95),_transparent_32%),linear-gradient(180deg,_#fcf8f3_0%,_#f4ece3_100%)]">
         <header class="border-b border-black/5 bg-white/70 backdrop-blur">
-            <div class="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-5 sm:px-6 lg:px-8">
+            <div class="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 py-5 sm:px-6 md:flex-row md:items-center md:justify-between lg:px-8">
                 <div>
                     <p class="text-xs font-bold uppercase tracking-[0.35em] text-clay">Meherloom</p>
-                    <h1 class="font-serif text-3xl font-semibold sm:text-4xl">Synced Dress Store</h1>
+                    <h1 class="font-serif text-2xl font-semibold sm:text-4xl">Synced Dress Store</h1>
                 </div>
-                <nav class="hidden items-center gap-8 text-sm font-semibold text-ink/70 md:flex" aria-label="Main navigation">
+                <nav class="flex flex-wrap gap-4 text-sm font-semibold text-ink/70 md:items-center md:gap-8" aria-label="Main navigation">
                     <a class="transition hover:text-clay" href="#brands">Brands</a>
                     <a class="transition hover:text-clay" href="#featured">Products</a>
                     <a class="transition hover:text-clay" href="#how-it-works">How It Works</a>
@@ -56,15 +56,15 @@
             <section class="mx-auto grid w-full max-w-7xl gap-10 px-4 py-10 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:px-8 lg:py-16">
                 <div class="flex flex-col justify-center">
                     <p class="mb-4 text-xs font-extrabold uppercase tracking-[0.35em] text-clay">Preorder Commerce</p>
-                    <h2 class="max-w-4xl font-serif text-5xl leading-none text-ink sm:text-6xl lg:text-7xl">
+                    <h2 class="max-w-4xl font-serif text-4xl leading-none text-ink sm:text-6xl lg:text-7xl">
                         Imported from source brands, stored in your database, sold from your storefront.
                     </h2>
                     <p class="mt-6 max-w-2xl text-base leading-8 text-ink/70 sm:text-lg">
                         Every product shown below comes from your own <code>Product</code> table. Stock can be rechecked against the source site before an order is confirmed.
                     </p>
-                    <div class="mt-8 flex flex-wrap gap-4">
-                        <a class="rounded-full bg-cocoa px-6 py-3 text-sm font-bold text-white shadow-soft transition hover:-translate-y-0.5" href="{% url 'meherloom:shop' %}">Browse Shop</a>
-                        <a class="rounded-full border border-ink/10 bg-white px-6 py-3 text-sm font-bold text-ink transition hover:border-clay hover:text-clay" href="#featured">Featured Picks</a>
+                    <div class="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-4">
+                        <a class="rounded-full bg-cocoa px-6 py-3 text-center text-sm font-bold text-white shadow-soft transition hover:-translate-y-0.5" href="{% url 'meherloom:shop' %}">Browse Shop</a>
+                        <a class="rounded-full border border-ink/10 bg-white px-6 py-3 text-center text-sm font-bold text-ink transition hover:border-clay hover:text-clay" href="#featured">Featured Picks</a>
                     </div>
                     <div class="mt-10 grid gap-3 sm:grid-cols-3">
                         {% for item in benefits %}
@@ -78,26 +78,26 @@
                 <div class="grid gap-5">
                     <div class="rounded-[2rem] bg-gradient-to-br from-[#f4ddd2] via-[#edd1c3] to-[#d9b3a1] p-6 shadow-soft sm:p-8">
                         <p class="text-xs font-extrabold uppercase tracking-[0.3em] text-cocoa/70">Catalog Status</p>
-                        <h3 class="mt-3 font-serif text-4xl leading-none text-ink">Your storefront is now database-backed.</h3>
+                        <h3 class="mt-3 font-serif text-3xl leading-none text-ink sm:text-4xl">Your storefront is now database-backed.</h3>
                         <div class="mt-8 grid gap-4 sm:grid-cols-2">
                             <div class="rounded-[1.5rem] bg-white/70 p-5">
                                 <p class="text-sm font-bold text-clay">Stored Locally</p>
-                                <p class="mt-2 font-serif text-2xl text-ink">Products, images, variants, stock snapshots</p>
+                                <p class="mt-2 font-serif text-xl text-ink sm:text-2xl">Products, images, variants, stock snapshots</p>
                             </div>
                             <div class="rounded-[1.5rem] bg-cocoa p-5 text-white">
                                 <p class="text-sm font-bold uppercase tracking-[0.18em] text-white/70">Live Validation</p>
-                                <p class="mt-2 font-serif text-2xl">Stock can be checked again at order time</p>
+                                <p class="mt-2 font-serif text-xl sm:text-2xl">Stock can be checked again at order time</p>
                             </div>
                         </div>
                     </div>
                     <div class="grid gap-5 sm:grid-cols-2">
                         <div class="rounded-[1.75rem] border border-black/5 bg-white p-6 shadow-soft">
                             <p class="text-xs font-extrabold uppercase tracking-[0.3em] text-clay">Brand Sync</p>
-                            <p class="mt-3 font-serif text-3xl leading-none">Each source brand can be imported into one shared storefront.</p>
+                            <p class="mt-3 font-serif text-2xl leading-none sm:text-3xl">Each source brand can be imported into one shared storefront.</p>
                         </div>
                         <div class="rounded-[1.75rem] border border-black/5 bg-[#efe3d7] p-6 shadow-soft">
                             <p class="text-xs font-extrabold uppercase tracking-[0.3em] text-cocoa">Import Flow</p>
-                            <p class="mt-3 font-serif text-3xl leading-none">Bring in products, variants, and images from one URL.</p>
+                            <p class="mt-3 font-serif text-2xl leading-none sm:text-3xl">Bring in products, variants, and images from one URL.</p>
                         </div>
                     </div>
                 </div>
@@ -108,7 +108,7 @@
                     <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                         <div>
                             <p class="text-xs font-extrabold uppercase tracking-[0.35em] text-clay">Tracked Brands</p>
-                            <h2 class="mt-2 font-serif text-4xl text-ink sm:text-5xl">Brands already mapped into your store.</h2>
+                            <h2 class="mt-2 font-serif text-3xl text-ink sm:text-5xl">Brands already mapped into your store.</h2>
                         </div>
                         <span class="text-sm font-bold text-clay">Stored locally, refreshed by your import workflow</span>
                     </div>
@@ -128,7 +128,7 @@
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                     <div>
                         <p class="text-xs font-extrabold uppercase tracking-[0.35em] text-clay">Imported Products</p>
-                        <h2 class="mt-2 font-serif text-4xl text-ink sm:text-5xl">Products rendered from your own database.</h2>
+                        <h2 class="mt-2 font-serif text-3xl text-ink sm:text-5xl">Products rendered from your own database.</h2>
                     </div>
                     <p class="max-w-xl text-sm leading-7 text-ink/65">
                         This storefront section reflects imported catalog records from your own database instead of hardcoded demo items.
@@ -163,19 +163,19 @@
                                     </p>
                                 </div>
                             </div>
-                            <div class="flex min-h-[15.5rem] flex-col p-5">
-                                <h3 class="font-serif text-[2.05rem] leading-[0.95] text-ink [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:3] overflow-hidden">
+                            <div class="flex min-h-[14.5rem] flex-col p-4 sm:min-h-[15.5rem] sm:p-5">
+                                <h3 class="font-serif text-[1.7rem] leading-[0.95] text-ink [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:3] overflow-hidden sm:text-[2.05rem]">
                                     {{ product.title|default:"Untitled Product" }}
                                 </h3>
                                 <p class="mt-3 min-h-[4.5rem] text-sm leading-7 text-ink/65 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:3] overflow-hidden">
                                     {{ product.description|default:"Imported product details will appear here after sync." }}
                                 </p>
-                                <div class="mt-auto flex items-center justify-between gap-4 pt-5">
-                                    <div>
+                                <div class="mt-auto flex flex-col gap-4 pt-5 sm:flex-row sm:items-center sm:justify-between">
+                                    <div class="w-full sm:w-auto">
                                         <p class="text-xs font-bold uppercase tracking-[0.2em] text-ink/45">Price</p>
                                         <span class="text-xl font-extrabold text-ink">&#2547;{{ product.manual_price|floatformat:2 }}</span>
                                     </div>
-                                    <a href="{% url 'meherloom:product_detail' product.pk %}" class="rounded-full border border-ink/10 px-4 py-2 text-sm font-bold text-ink transition group-hover:border-clay group-hover:text-clay">
+                                    <a href="{% url 'meherloom:product_detail' product.pk %}" class="rounded-full border border-ink/10 px-4 py-2 text-center text-sm font-bold text-ink transition group-hover:border-clay group-hover:text-clay sm:min-w-[9rem]">
                                         View Product
                                     </a>
                                 </div>
@@ -193,7 +193,7 @@
                 <div class="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
                     <div class="rounded-[2rem] bg-cocoa p-8 text-white shadow-soft sm:p-10">
                         <p class="text-xs font-extrabold uppercase tracking-[0.35em] text-white/60">Flow</p>
-                        <h2 class="mt-3 font-serif text-4xl leading-none sm:text-5xl">Source site to local catalog to customer-facing store.</h2>
+                        <h2 class="mt-3 font-serif text-3xl leading-none sm:text-5xl">Source site to local catalog to customer-facing store.</h2>
                         <p class="mt-5 max-w-xl text-sm leading-7 text-white/75">
                             Your import workflow brings in title, images, variants, and stock snapshot locally. The website reads from that local data, while live stock can still be rechecked before final order confirmation.
                         </p>
@@ -201,15 +201,15 @@
                     <div class="grid gap-6 sm:grid-cols-3">
                         <div class="rounded-[2rem] border border-black/5 bg-white p-6 shadow-soft">
                             <p class="text-sm font-extrabold uppercase tracking-[0.25em] text-clay">1. Import</p>
-                            <p class="mt-4 font-serif text-3xl leading-none">Import source products into your own catalog.</p>
+                            <p class="mt-4 font-serif text-2xl leading-none sm:text-3xl">Import source products into your own catalog.</p>
                         </div>
                         <div class="rounded-[2rem] border border-black/5 bg-white p-6 shadow-soft">
                             <p class="text-sm font-extrabold uppercase tracking-[0.25em] text-clay">2. Store</p>
-                            <p class="mt-4 font-serif text-3xl leading-none">Keep data in your own database.</p>
+                            <p class="mt-4 font-serif text-2xl leading-none sm:text-3xl">Keep data in your own database.</p>
                         </div>
                         <div class="rounded-[2rem] border border-black/5 bg-white p-6 shadow-soft">
                             <p class="text-sm font-extrabold uppercase tracking-[0.25em] text-clay">3. Sell</p>
-                            <p class="mt-4 font-serif text-3xl leading-none">Show products on your own site.</p>
+                            <p class="mt-4 font-serif text-2xl leading-none sm:text-3xl">Show products on your own site.</p>
                         </div>
                     </div>
                 </div>

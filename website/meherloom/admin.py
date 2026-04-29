@@ -1,5 +1,7 @@
 from django.contrib import admin, messages
 from django.db.models import Count
+from django.db import models
+from django.forms import Textarea, TextInput
 
 from .models import Brand, Order, OrderItem, Product, ProductImage, ProductVariant
 from .management.commands.sync_brand_adapters import BRAND_ADAPTER_MAP
@@ -114,56 +116,93 @@ def import_selected_products(modeladmin, request, queryset):
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
     list_display = (
+        "id",
         "title",
         "brand",
         "manual_price",
+        "source_price",
+        "source_sku",
         "stock_status",
         "sync_status",
         "last_checked_at",
         "is_published",
     )
     list_filter = ("brand", "stock_status", "sync_status", "is_published")
+    list_editable = ("manual_price",)
+    list_display_links = ("id", "title")   
     search_fields = ("title", "source_url", "source_sku", "source_product_id")
     actions = [import_selected_products, refresh_products]
     inlines = [ProductImageInline, ProductVariantInline]
     autocomplete_fields = ("brand",)
+    formfield_overrides = {
+        models.TextField: {"widget": Textarea(attrs={"rows": 6})},
+        models.CharField: {"widget": TextInput(attrs={"size": 60})},
+    }
     readonly_fields = (
-        "title",
         "slug",
-        "description",
-        "source_product_id",
-        "source_sku",
-        "source_currency",
-        "source_price",
-        "stock_status",
-        "stock_quantity",
         "last_checked_at",
         "last_imported_at",
         "next_check_at",
         "sync_status",
         "sync_error",
     )
-    fields = (
-        "brand",
-        "source_url",
-        "manual_price",
-        "size_guide_image",
-        "is_published",
-        "title",
-        "slug",
-        "description",
-        "size_guide",
-        "source_product_id",
-        "source_sku",
-        "source_currency",
-        "source_price",
-        "stock_status",
-        "stock_quantity",
-        "last_checked_at",
-        "last_imported_at",
-        "next_check_at",
-        "sync_status",
-        "sync_error",
+    fieldsets = (
+        (
+            "Catalog",
+            {
+                "fields": (
+                    "brand",
+                    "source_url",
+                    "is_published",
+                )
+            },
+        ),
+        (
+            "Storefront",
+            {
+                "fields": (
+                    "title",
+                    "manual_price",
+                    "slug",
+                )
+            },
+        ),
+        (
+            "Imported Details",
+            {
+                "fields": (
+                    "description",
+                    "size_guide",
+                    "size_guide_image",
+                ),
+                "description": "This is where the imported product details are stored for your storefront. You can edit them manually.",
+            },
+        ),
+        (
+            "Source Data",
+            {
+                "fields": (
+                    "source_product_id",
+                    "source_sku",
+                    "source_currency",
+                    "source_price",
+                    "stock_status",
+                    "stock_quantity",
+                )
+            },
+        ),
+        (
+            "Sync Status",
+            {
+                "fields": (
+                    "last_checked_at",
+                    "last_imported_at",
+                    "next_check_at",
+                    "sync_status",
+                    "sync_error",
+                )
+            },
+        ),
     )
 
     def save_model(self, request, obj, form, change):

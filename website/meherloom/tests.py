@@ -272,6 +272,57 @@ class ProductDescriptionFormattingTests(TestCase):
         )
         self.assertEqual(sections[2]["heading"], "Description")
         self.assertIn("Revamp your look in our printed purple blended grip silk A-line shirt", sections[2]["lines"][0])
+        self.assertEqual(sections[3]["heading"], "Product Notes")
+        self.assertEqual(
+            sections[3]["lines"],
+            [
+                "Model Height: 5 Feet 6 Inches",
+                "Model Wears Size: S",
+                "View Size Chart A-Line Shirt",
+            ],
+        )
+
+    def test_split_product_description_moves_perfect_your_look_out_of_component_details(self):
+        description = (
+            "Shirt Colour: Brown Fabric: Blended Satin "
+            "Culottes Colour: Brown Fabric: Viscose Raw Silk "
+            "Perfect your look in our printed brown blended satin straight shirt and viscose raw silk culottes. "
+            "Model Height: 5 Feet 6 Inches Model Wears Size: S View Size Chart Straight Shirt"
+        )
+
+        sections = _split_product_description(description)
+
+        self.assertEqual(sections[0]["heading"], "Shirt")
+        self.assertEqual(sections[0]["lines"], ["Colour: Brown", "Fabric: Blended Satin"])
+        self.assertEqual(sections[1]["heading"], "Culottes")
+        self.assertEqual(sections[1]["lines"], ["Colour: Brown", "Fabric: Viscose Raw Silk"])
+        self.assertEqual(sections[2]["heading"], "Description")
+        self.assertEqual(
+            sections[2]["lines"],
+            ["Perfect your look in our printed brown blended satin straight shirt and viscose raw silk culottes."],
+        )
+
+    def test_split_product_description_handles_model_wears_without_size_keyword(self):
+        description = (
+            "Trouser Colour: Teal Green Fabric: 100% Cotton "
+            "Wide Leg Pull-On Trousers In Textured Cotton Muslin. Narrow Elasticated Waistband. "
+            "Model Height: 5 Feet 7 Inches Model Wears: Small View Size Chart BOTTOM"
+        )
+
+        sections = _split_product_description(description)
+
+        self.assertEqual(sections[0]["heading"], "Trouser")
+        self.assertIn("Colour: Teal Green", sections[0]["lines"])
+        self.assertTrue(any(line.startswith("Fabric: 100% Cotton") for line in sections[0]["lines"]))
+        self.assertEqual(sections[1]["heading"], "Product Notes")
+        self.assertEqual(
+            sections[1]["lines"],
+            [
+                "Model Height: 5 Feet 7 Inches",
+                "Model Wears: Small",
+                "View Size Chart BOTTOM",
+            ],
+        )
 
 
 class ShopifyScraperTests(TestCase):
@@ -622,6 +673,94 @@ class SapphireScraperTests(TestCase):
 
         self.assertIn("<table", payload["size_guide"])
         self.assertNotIn("tab-pane", payload["size_guide"])
+
+    def test_sapphire_adapter_cleans_western_wear_title_and_variants(self):
+        adapter = SapphireBrandAdapter(brand=self.brand)
+        html = """
+        <html>
+            <body>
+                <div>Get the look Get the look Get the look Get the look Home Woman WEST Cotton Muslin Pull-On Trousers Cotton Muslin Pull-On Trousers</div>
+                <h1>Get the look Get the look Home Woman WEST Cotton Muslin Pull-On Trousers Cotton Muslin Pull-On Trousers</h1>
+                <div>Rs.4,490</div>
+                <div>SKU: WBTM26V30006_999</div>
+                <div>Select your size</div>
+                <button>WEST</button><button>XS</button><button>S</button><button>M</button><button>L</button><button>XL</button>
+                <button>Add to Bag</button>
+                <div>Description : Teal Green Fabric: 100% Cotton Wide Leg Pull-On Trousers In Textured Cotton Muslin. Narrow Elasticated Waistband. Drawcord Fastening. Side Pockets. Model Height: 5 Feet 7 Inches Model Wears: Small View Size Chart BOTTOM CM INCHES Size XS S M L XL</div>
+            </body>
+        </html>
+        """
+
+        adapter.fetch_url = lambda url: html
+        product = Product(
+            brand=self.brand,
+            source_url="https://pk.sapphireonline.pk/collections/western-wear/products/WBTM26V30006_999.html",
+            manual_price=Decimal("4490.00"),
+        )
+
+        payload = adapter.fetch_product(product)
+
+        self.assertEqual(payload["title"], "Cotton Muslin Pull-On Trousers")
+        self.assertEqual([variant["name"] for variant in payload["variants"]], ["XS", "S", "M", "L", "XL"])
+        self.assertTrue(payload["description"].startswith("Trouser Colour: Teal Green"))
+        self.assertNotIn("View Size Chart BOTTOM CM INCHES", payload["description"])
+
+    def test_sapphire_adapter_cleans_ready_to_wear_set_description(self):
+        adapter = SapphireBrandAdapter(brand=self.brand)
+        html = """
+        <html>
+            <body>
+                <h1>3 Piece - Printed Lawn Suit</h1>
+                <div>Rs.9,990</div>
+                <div>SKU: S4UDYS2V0137_999</div>
+                <button>Add to Bag</button>
+                <div>
+                    Description Shirt &amp; Dupatta Colour: Green Fabric: Lawn Wide Culottes Colour: Green Fabric: Lawn
+                    Step out in style in our printed green lawn straight shirt and wide culottes paired with a matching dupatta.
+                    Model Height: 5 Feet 6 Inches Model Wears Size: S View Size Chart Straight Shirt
+                </div>
+            </body>
+        </html>
+        """
+
+        adapter.fetch_url = lambda url: html
+        product = Product(
+            brand=self.brand,
+            source_url="https://pk.sapphireonline.pk/collections/ready-to-wear/products/S4UDYS2V0137_999.html",
+            manual_price=Decimal("9990.00"),
+        )
+
+        payload = adapter.fetch_product(product)
+
+        self.assertTrue(payload["description"].startswith("Shirt Colour: Green Fabric: Lawn"))
+        self.assertIn("Culottes Colour: Green Fabric: Lawn", payload["description"])
+        self.assertIn("Dupatta Colour: Green Fabric: Lawn", payload["description"])
+
+    def test_sapphire_adapter_cleans_accessories_title(self):
+        adapter = SapphireBrandAdapter(brand=self.brand)
+        html = """
+        <html>
+            <body>
+                <div>Get the look Get the look Get the look Get the look Get the look Home Woman Accessories Black Shoulder Bag Black Shoulder Bag</div>
+                <h1>Get the look Get the look Home Woman Accessories Black Shoulder Bag Black Shoulder Bag</h1>
+                <div>Rs.7,490</div>
+                <div>SKU: 0000HB260069</div>
+                <div>Description Material: Outer Shell: Pu, Linning: Polyester Colour: Black Measurement : L:29.5", W: 13", H: 19" Perfect your style with our black shoulder bag with a magnetic clasp closure. Note: Actual product color may vary slightly from the image.</div>
+            </body>
+        </html>
+        """
+
+        adapter.fetch_url = lambda url: html
+        product = Product(
+            brand=self.brand,
+            source_url="https://pk.sapphireonline.pk/collections/accessories/products/0000HB260069.html",
+            manual_price=Decimal("7490.00"),
+        )
+
+        payload = adapter.fetch_product(product)
+
+        self.assertEqual(payload["title"], "Black Shoulder Bag")
+        self.assertIn("Lining: Polyester", payload["description"])
 
 
 class AghaNoorScraperTests(TestCase):
