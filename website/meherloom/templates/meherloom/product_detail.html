@@ -203,6 +203,32 @@
 
     <div id="image-lightbox" class="fixed inset-0 z-50 hidden bg-black/80 px-4 py-8">
         <div class="mx-auto flex h-full max-w-6xl items-center justify-center">
+            <div class="absolute left-6 top-6 flex flex-wrap gap-3">
+                <button
+                    type="button"
+                    id="lightbox-zoom-in"
+                    class="rounded-full bg-white/10 px-4 py-2 text-sm font-bold text-white backdrop-blur"
+                    onclick="window.meherloomZoomIn()"
+                >
+                    Zoom In
+                </button>
+                <button
+                    type="button"
+                    id="lightbox-zoom-out"
+                    class="rounded-full bg-white/10 px-4 py-2 text-sm font-bold text-white backdrop-blur"
+                    onclick="window.meherloomZoomOut()"
+                >
+                    Zoom Out
+                </button>
+                <button
+                    type="button"
+                    id="lightbox-zoom-reset"
+                    class="rounded-full bg-white/10 px-4 py-2 text-sm font-bold text-white backdrop-blur"
+                    onclick="window.meherloomResetZoom()"
+                >
+                    Reset
+                </button>
+            </div>
             <button
                 type="button"
                 id="lightbox-close"
@@ -212,7 +238,13 @@
             >
                 Close
             </button>
-            <img id="lightbox-image" src="" alt="" class="max-h-full max-w-full rounded-[1.5rem] object-contain shadow-2xl">
+            <img
+                id="lightbox-image"
+                src=""
+                alt=""
+                class="max-h-full max-w-full cursor-zoom-in rounded-[1.5rem] object-contain shadow-2xl transition duration-200"
+                onclick="window.meherloomCycleZoom(event)"
+            >
         </div>
     </div>
 
@@ -290,6 +322,11 @@
 
             lightboxImage.src = mainTrigger.dataset.imageSrc || "";
             lightboxImage.alt = mainTrigger.dataset.imageAlt || "";
+            lightboxImage.dataset.zoomLevel = "1";
+            lightboxImage.style.transform = "scale(1)";
+            lightboxImage.style.transformOrigin = "center center";
+            lightboxImage.classList.remove("cursor-zoom-out");
+            lightboxImage.classList.add("cursor-zoom-in");
             lightbox.classList.remove("hidden");
             document.body.classList.add("overflow-hidden");
             return false;
@@ -304,8 +341,74 @@
 
             lightbox.classList.add("hidden");
             lightboxImage.src = "";
+            lightboxImage.dataset.zoomLevel = "1";
+            lightboxImage.style.transform = "scale(1)";
+            lightboxImage.style.transformOrigin = "center center";
+            lightboxImage.classList.remove("cursor-zoom-out");
+            lightboxImage.classList.add("cursor-zoom-in");
             document.body.classList.remove("overflow-hidden");
             return false;
+        };
+
+        window.meherloomSetZoom = function (level, originX, originY) {
+            var lightboxImage = document.getElementById("lightbox-image");
+            if (!lightboxImage) {
+                return false;
+            }
+
+            var clampedLevel = Math.max(1, Math.min(level, 4));
+            lightboxImage.dataset.zoomLevel = String(clampedLevel);
+            lightboxImage.style.transform = "scale(" + clampedLevel + ")";
+            if (originX && originY) {
+                lightboxImage.style.transformOrigin = originX + " " + originY;
+            } else {
+                lightboxImage.style.transformOrigin = "center center";
+            }
+
+            if (clampedLevel > 1) {
+                lightboxImage.classList.remove("cursor-zoom-in");
+                lightboxImage.classList.add("cursor-zoom-out");
+            } else {
+                lightboxImage.classList.remove("cursor-zoom-out");
+                lightboxImage.classList.add("cursor-zoom-in");
+            }
+            return false;
+        };
+
+        window.meherloomZoomIn = function () {
+            var lightboxImage = document.getElementById("lightbox-image");
+            if (!lightboxImage) {
+                return false;
+            }
+            var currentLevel = parseFloat(lightboxImage.dataset.zoomLevel || "1");
+            return window.meherloomSetZoom(currentLevel + 0.75);
+        };
+
+        window.meherloomZoomOut = function () {
+            var lightboxImage = document.getElementById("lightbox-image");
+            if (!lightboxImage) {
+                return false;
+            }
+            var currentLevel = parseFloat(lightboxImage.dataset.zoomLevel || "1");
+            return window.meherloomSetZoom(currentLevel - 0.75);
+        };
+
+        window.meherloomResetZoom = function () {
+            return window.meherloomSetZoom(1);
+        };
+
+        window.meherloomCycleZoom = function (event) {
+            var lightboxImage = document.getElementById("lightbox-image");
+            if (!lightboxImage) {
+                return false;
+            }
+
+            var currentLevel = parseFloat(lightboxImage.dataset.zoomLevel || "1");
+            var nextLevel = currentLevel >= 4 ? 1 : currentLevel + 0.75;
+            var rect = lightboxImage.getBoundingClientRect();
+            var originX = ((event.clientX - rect.left) / rect.width) * 100;
+            var originY = ((event.clientY - rect.top) / rect.height) * 100;
+            return window.meherloomSetZoom(nextLevel, originX + "%", originY + "%");
         };
 
         window.meherloomOpenSizeGuide = function () {
