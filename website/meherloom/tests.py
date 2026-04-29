@@ -314,6 +314,7 @@ class ProductDescriptionFormattingTests(TestCase):
         self.assertEqual(sections[0]["heading"], "Trouser")
         self.assertIn("Colour: Teal Green", sections[0]["lines"])
         self.assertTrue(any(line.startswith("Fabric: 100% Cotton") for line in sections[0]["lines"]))
+        self.assertIn("Narrow Elasticated Waistband.", sections[0]["lines"])
         self.assertEqual(sections[1]["heading"], "Product Notes")
         self.assertEqual(
             sections[1]["lines"],
@@ -761,6 +762,30 @@ class SapphireScraperTests(TestCase):
 
         self.assertEqual(payload["title"], "Black Shoulder Bag")
         self.assertIn("Lining: Polyester", payload["description"])
+
+    def test_sapphire_adapter_strips_sku_suffix_from_western_wear_title(self):
+        adapter = SapphireBrandAdapter(brand=self.brand)
+        html = """
+        <html>
+            <body>
+                <h1>Pull-On Trousers WBTM26V30006</h1>
+                <div>Rs.4,490</div>
+                <div>SKU: WBTM26V30006_999</div>
+                <button>Add to Bag</button>
+            </body>
+        </html>
+        """
+
+        adapter.fetch_url = lambda url: html
+        product = Product(
+            brand=self.brand,
+            source_url="https://pk.sapphireonline.pk/collections/western-wear/products/WBTM26V30006_999.html",
+            manual_price=Decimal("4490.00"),
+        )
+
+        payload = adapter.fetch_product(product)
+
+        self.assertEqual(payload["title"], "Pull-On Trousers")
 
 
 class AghaNoorScraperTests(TestCase):

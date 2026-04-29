@@ -332,9 +332,10 @@ def _split_section_lines(content):
     for line in raw_lines:
         cleaned = re.sub(r"\s+", " ", line).strip()
         detail_line, overflow_line = _split_detail_line_and_overflow(cleaned)
-        if detail_line and detail_line not in seen:
-            seen.add(detail_line)
-            lines.append(detail_line)
+        for split_line in _split_line_sentences(detail_line):
+            if split_line and split_line not in seen:
+                seen.add(split_line)
+                lines.append(split_line)
         if overflow_line:
             overflow_lines.append(overflow_line)
     return lines, overflow_lines
@@ -413,3 +414,15 @@ def _split_model_meta(text):
         if value:
             meta_lines.append(value)
     return meta_lines
+
+
+def _split_line_sentences(line):
+    if not line:
+        return []
+    if ". " not in line:
+        return [line]
+
+    segments = [segment.strip() for segment in re.split(r"(?<=\.)\s+", line) if segment.strip()]
+    if len(segments) <= 1:
+        return [line]
+    return segments

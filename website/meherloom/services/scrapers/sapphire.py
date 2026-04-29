@@ -272,6 +272,7 @@ class SapphireBrandAdapter(GenericBrandAdapter):
         cleaned = self._collapse_duplicate_title(cleaned)
         cleaned = re.sub(r"\b(?:Woman|WEST|Modest Wear|Accessories)\b\s+", "", cleaned, flags=re.IGNORECASE).strip()
         cleaned = re.sub(r"\s+Sapphire\s+PK$", "", cleaned, flags=re.IGNORECASE).strip()
+        cleaned = re.sub(r"\s+[A-Z]{2,}[A-Z0-9_]{5,}$", "", cleaned).strip()
         return cleaned
 
     def _looks_like_real_title(self, title):
