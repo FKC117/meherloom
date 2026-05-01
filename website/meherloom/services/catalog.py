@@ -1,3 +1,5 @@
+import re
+
 from django.db import models, transaction
 from django.utils import timezone
 from django.utils.text import slugify
@@ -18,7 +20,7 @@ def sync_product_from_source(product, refresh_details=False):
     if refresh_details:
         product.title = payload.get("title", product.title)
         product.slug = slugify(product.title)[:255]
-        product.description = payload.get("description", product.description)
+        product.description = sanitize_imported_description(payload.get("description", product.description))
         product.size_guide = payload.get("size_guide", product.size_guide)
         product.source_product_id = payload.get("source_product_id", product.source_product_id)
         product.source_sku = payload.get("source_sku", product.source_sku)
@@ -68,6 +70,26 @@ def sync_product_from_source(product, refresh_details=False):
         )
 
     return product
+
+
+def sanitize_imported_description(description):
+    cleaned = re.sub(r"\s+", " ", description or "").strip()
+    if not cleaned:
+        return ""
+
+    patterns = (
+        r"Delivery Date:\s*.*?(?=(?:For further queries|For any queries|Contact us|WhatsApp|$))",
+        r"For further queries/customization/orders call or WhatsApp on:\s*.*$",
+        r"For further queries\s*/\s*customization\s*/\s*orders call or WhatsApp on:\s*.*$",
+        r"For any queries/customization/orders call or WhatsApp on:\s*.*$",
+        r"Contact us on WhatsApp:\s*.*$",
+        r"View Size Chart\s+[A-Za-z][A-Za-z&/\- ]{0,80}",
+    )
+    for pattern in patterns:
+        cleaned = re.sub(pattern, "", cleaned, flags=re.IGNORECASE)
+
+    cleaned = re.sub(r"\s+", " ", cleaned).strip(" -|")
+    return cleaned
 
 
 def sync_due_products(queryset=None, refresh_details=False):

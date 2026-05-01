@@ -58,13 +58,17 @@
                     </div>
 
                     {% if primary_image or secondary_images %}
-                        <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
+                        <div
+                            id="gallery-thumbs"
+                            class="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4"
+                        >
                             {% if primary_image %}
                                 <button
                                     type="button"
                                     class="gallery-thumb overflow-hidden rounded-[1.5rem] border-2 border-cocoa bg-white shadow-sm"
                                     data-image-src="{{ primary_image.image_url }}"
                                     data-image-alt="{{ primary_image.alt_text|default:product.title }}"
+                                    data-gallery-index="0"
                                     onclick="window.meherloomSwapImage('{{ primary_image.image_url|escapejs }}', '{{ primary_image.alt_text|default:product.title|escapejs }}', this)"
                                     aria-label="Show image 1"
                                 >
@@ -77,6 +81,7 @@
                                     class="gallery-thumb overflow-hidden rounded-[1.5rem] border border-black/5 bg-white shadow-sm transition hover:border-cocoa"
                                     data-image-src="{{ image.image_url }}"
                                     data-image-alt="{{ image.alt_text|default:product.title }}"
+                                    data-gallery-index="{{ forloop.counter }}"
                                     onclick="window.meherloomSwapImage('{{ image.image_url|escapejs }}', '{{ image.alt_text|default:product.title|escapejs }}', this)"
                                     aria-label="Show another product image"
                                 >
@@ -202,7 +207,25 @@
     </div>
 
         <div id="image-lightbox" class="fixed inset-0 z-50 hidden bg-black/80 px-3 py-6 sm:px-4 sm:py-8">
-            <div class="mx-auto flex h-full max-w-6xl items-center justify-center">
+            <div id="image-lightbox-stage" class="mx-auto flex h-full max-w-6xl items-center justify-center">
+            <button
+                type="button"
+                id="lightbox-prev"
+                class="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-white/10 px-3 py-3 text-xs font-bold text-white backdrop-blur transition hover:bg-white/20 sm:left-6 sm:px-4 sm:text-sm"
+                onclick="window.meherloomShowPreviousImage()"
+                aria-label="Show previous image"
+            >
+                Prev
+            </button>
+            <button
+                type="button"
+                id="lightbox-next"
+                class="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-white/10 px-3 py-3 text-xs font-bold text-white backdrop-blur transition hover:bg-white/20 sm:right-6 sm:px-4 sm:text-sm"
+                onclick="window.meherloomShowNextImage()"
+                aria-label="Show next image"
+            >
+                Next
+            </button>
             <div class="absolute left-3 top-3 flex flex-wrap gap-2 sm:left-6 sm:top-6 sm:gap-3">
                 <button
                     type="button"
@@ -287,6 +310,32 @@
     {% endif %}
 
     <script>
+        window.meherloomGetThumbs = function () {
+            return Array.prototype.slice.call(document.querySelectorAll(".gallery-thumb"));
+        };
+
+        window.meherloomGetActiveThumbIndex = function () {
+            var thumbs = window.meherloomGetThumbs();
+            var activeIndex = thumbs.findIndex(function (item) {
+                return item.classList.contains("border-cocoa");
+            });
+            return activeIndex >= 0 ? activeIndex : 0;
+        };
+
+        window.meherloomSyncLightboxImage = function () {
+            var mainTrigger = document.getElementById("gallery-main-trigger");
+            var lightbox = document.getElementById("image-lightbox");
+            var lightboxImage = document.getElementById("lightbox-image");
+            if (!mainTrigger || !lightbox || !lightboxImage || lightbox.classList.contains("hidden")) {
+                return false;
+            }
+
+            lightboxImage.src = mainTrigger.dataset.imageSrc || "";
+            lightboxImage.alt = mainTrigger.dataset.imageAlt || "";
+            window.meherloomResetZoom();
+            return false;
+        };
+
         window.meherloomSwapImage = function (src, alt, thumb) {
             var mainTrigger = document.getElementById("gallery-main-trigger");
             var mainImage = document.getElementById("gallery-main-image");
@@ -309,6 +358,7 @@
                 thumb.classList.remove("border-black/5");
                 thumb.classList.add("border-cocoa", "border-2");
             }
+            window.meherloomSyncLightboxImage();
             return false;
         };
 
@@ -348,6 +398,31 @@
             lightboxImage.classList.add("cursor-zoom-in");
             document.body.classList.remove("overflow-hidden");
             return false;
+        };
+
+        window.meherloomShowGalleryImageByIndex = function (index) {
+            var thumbs = window.meherloomGetThumbs();
+            if (!thumbs.length) {
+                return false;
+            }
+
+            var normalizedIndex = ((index % thumbs.length) + thumbs.length) % thumbs.length;
+            var targetThumb = thumbs[normalizedIndex];
+            return window.meherloomSwapImage(
+                targetThumb.dataset.imageSrc || "",
+                targetThumb.dataset.imageAlt || "",
+                targetThumb
+            );
+        };
+
+        window.meherloomShowPreviousImage = function () {
+            var currentIndex = window.meherloomGetActiveThumbIndex();
+            return window.meherloomShowGalleryImageByIndex(currentIndex - 1);
+        };
+
+        window.meherloomShowNextImage = function () {
+            var currentIndex = window.meherloomGetActiveThumbIndex();
+            return window.meherloomShowGalleryImageByIndex(currentIndex + 1);
         };
 
         window.meherloomSetZoom = function (level, originX, originY) {
@@ -435,11 +510,20 @@
 
         document.addEventListener("DOMContentLoaded", function () {
             var lightbox = document.getElementById("image-lightbox");
+            var lightboxStage = document.getElementById("image-lightbox-stage");
             var sizeGuideModal = document.getElementById("size-guide-modal");
 
             if (lightbox) {
                 lightbox.addEventListener("click", function (event) {
                     if (event.target === lightbox) {
+                        window.meherloomCloseLightbox();
+                    }
+                });
+            }
+
+            if (lightboxStage) {
+                lightboxStage.addEventListener("click", function (event) {
+                    if (event.target === lightboxStage) {
                         window.meherloomCloseLightbox();
                     }
                 });
@@ -456,6 +540,12 @@
             document.addEventListener("keydown", function (event) {
                 if (event.key === "Escape" && lightbox && !lightbox.classList.contains("hidden")) {
                     window.meherloomCloseLightbox();
+                }
+                if (event.key === "ArrowLeft" && lightbox && !lightbox.classList.contains("hidden")) {
+                    window.meherloomShowPreviousImage();
+                }
+                if (event.key === "ArrowRight" && lightbox && !lightbox.classList.contains("hidden")) {
+                    window.meherloomShowNextImage();
                 }
                 if (event.key === "Escape" && sizeGuideModal && !sizeGuideModal.classList.contains("hidden")) {
                     window.meherloomCloseSizeGuide();

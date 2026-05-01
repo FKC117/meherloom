@@ -1,8 +1,10 @@
 from decimal import Decimal, InvalidOperation
 import re
+from urllib.parse import urlparse
 
 from meherloom.models import Product
 from meherloom.services.scrapers.generic import GenericBrandAdapter
+from meherloom.services.scrapers.shopify import ShopifyBrandAdapter
 
 
 class AghaNoorBrandAdapter(GenericBrandAdapter):
@@ -20,6 +22,11 @@ class AghaNoorBrandAdapter(GenericBrandAdapter):
     token_pattern = re.compile(r">\s*([^<>]{1,40})\s*<")
 
     def fetch_product(self, product):
+        if self._is_bridal_product(product.source_url):
+            payload = ShopifyBrandAdapter(self.brand).fetch_product(product)
+            payload["description"] = self._clean_bridal_description(payload.get("description", ""))
+            return payload
+
         html = self.fetch_url(product.source_url)
         product_data = (
             self._extract_product_from_json_ld(html)
@@ -119,7 +126,7 @@ class AghaNoorBrandAdapter(GenericBrandAdapter):
         return Product.StockStatus.UNKNOWN
 
     def _extract_agha_noor_variants(self, product_data, html, stock_status):
-        variants = self._extract_variants(product_data)
+        variants = self._clean_variants(self._extract_variants(product_data))
         if variants:
             return variants
 
@@ -169,8 +176,66 @@ class AghaNoorBrandAdapter(GenericBrandAdapter):
             upper = cleaned.upper()
             if upper in {"INPUT", "SELECT", "BUTTON"}:
                 continue
+            if not self._looks_like_choice_value(cleaned):
+                continue
             if cleaned in seen:
                 continue
             seen.add(cleaned)
             values.append(cleaned)
         return values
+
+    def _clean_variants(self, variants):
+        cleaned_variants = []
+        seen = set()
+        for variant in variants:
+            name = (variant.get("name") or "").strip()
+            if not self._looks_like_variant_name(name):
+                continue
+            key = (
+                name.lower(),
+                (variant.get("source_sku") or "").strip().lower(),
+                (variant.get("source_variant_id") or "").strip().lower(),
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            cleaned_variants.append(variant)
+        return cleaned_variants
+
+    def _looks_like_variant_name(self, name):
+        if not name:
+            return False
+        lowered = name.lower()
+        if any(marker in lowered for marker in ("appendto(", "scappshop", "{{amount", "$m(", '").', 'head");')):
+            return False
+        if "{{" in name or "}}" in name:
+            return False
+        return True
+
+    def _looks_like_choice_value(self, value):
+        lowered = value.lower()
+        if any(marker in lowered for marker in ("add to cart", "sold out", "free shipping", "shipping & return")):
+            return False
+        if len(value) > 30:
+            return False
+        return True
+
+    def _is_bridal_product(self, source_url):
+        return "aghanoorbridal.com" in urlparse(source_url).netloc.lower()
+
+    def _clean_bridal_description(self, description):
+        cleaned = re.sub(r"\s+", " ", description or "").strip()
+        if not cleaned:
+            return ""
+
+        patterns = (
+            r"Delivery Date:\s*.*?(?=(?:For further queries|$))",
+            r"For further queries/customization/orders call or WhatsApp on:\s*.*$",
+            r"For further queries\s*/\s*customization\s*/\s*orders call or WhatsApp on:\s*.*$",
+            r"\+?\d[\d\s-]{7,}$",
+        )
+        for pattern in patterns:
+            cleaned = re.sub(pattern, "", cleaned, flags=re.IGNORECASE)
+
+        cleaned = re.sub(r"\s+", " ", cleaned).strip(" -|")
+        return cleaned

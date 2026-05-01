@@ -11,7 +11,7 @@ from django.urls import reverse
 
 from .management.commands.sync_brand_adapters import BRAND_ADAPTER_MAP
 from .models import Brand, Order, OrderItem, Product
-from .services.catalog import sync_product_from_source
+from .services.catalog import sanitize_imported_description, sync_product_from_source
 from .services.orders import confirm_order_with_live_stock
 from .services.scrapers.generic import GenericBrandAdapter
 from .services.scrapers.agha_noor import AghaNoorBrandAdapter
@@ -63,6 +63,18 @@ class CatalogSyncTests(TestCase):
         self.assertEqual(self.product.size_guide, "S: 36 | M: 38")
         self.assertEqual(self.product.images.count(), 1)
         self.assertEqual(self.product.variants.count(), 1)
+
+    def test_sanitize_imported_description_removes_operational_copy_and_view_size_chart(self):
+        description = (
+            "A flattering festive silhouette with fine detailing. "
+            "View Size Chart Straight Shirt "
+            "Delivery Date: 12 Weeks "
+            "For further queries/customization/orders call or WhatsApp on: +92 325 2231455"
+        )
+
+        cleaned = sanitize_imported_description(description)
+
+        self.assertEqual(cleaned, "A flattering festive silhouette with fine detailing.")
 
 
 class OrderConfirmationTests(TestCase):
@@ -853,6 +865,85 @@ class AghaNoorScraperTests(TestCase):
         payload = adapter.fetch_product(product)
 
         self.assertEqual(payload["stock_status"], Product.StockStatus.OUT_OF_STOCK)
+
+    @patch("meherloom.services.scrapers.agha_noor.ShopifyBrandAdapter.fetch_product")
+    def test_agha_noor_adapter_uses_shopify_path_for_bridal_domain(self, mocked_fetch):
+        mocked_fetch.return_value = {
+            "title": "Gulabiya",
+            "description": (
+                "Gulabiya is immersed in an alluring fuchsia. "
+                "Delivery Date: 12 Weeks "
+                "For further queries/customization/orders call or WhatsApp on: +92 325 2231455"
+            ),
+            "source_product_id": "123",
+            "source_sku": "GLB-01",
+            "source_currency": "PKR",
+            "source_price": Decimal("45000.00"),
+            "stock_status": Product.StockStatus.IN_STOCK,
+            "stock_quantity": 2,
+            "image_urls": ["https://example.com/bridal.jpg"],
+            "variants": [{"name": "X-Small", "stock_status": Product.StockStatus.IN_STOCK}],
+        }
+
+        adapter = AghaNoorBrandAdapter(brand=self.brand)
+        product = Product(
+            brand=self.brand,
+            source_url="https://aghanoorbridal.com/collections/festive-formals/products/gulabiya",
+            manual_price=Decimal("45000.00"),
+        )
+
+        payload = adapter.fetch_product(product)
+
+        mocked_fetch.assert_called_once()
+        self.assertEqual(payload["title"], "Gulabiya")
+        self.assertEqual(payload["source_price"], Decimal("45000.00"))
+        self.assertEqual(payload["variants"][0]["name"], "X-Small")
+        self.assertNotIn("Delivery Date:", payload["description"])
+        self.assertNotIn("WhatsApp", payload["description"])
+        self.assertIn("Gulabiya is immersed", payload["description"])
+
+    def test_agha_noor_adapter_filters_broken_embedded_variant_names(self):
+        adapter = AghaNoorBrandAdapter(brand=self.brand)
+        html = """
+        <html>
+            <head>
+                <meta property="og:title" content="(Unstitched) 3 Piece - Pure Embroidered Cotton Net Suit S114058" />
+                <meta property="og:description" content="Graceful unstitched suit." />
+            </head>
+            <body>
+                <h1>(Unstitched) 3 Piece - Pure Embroidered Cotton Net Suit S114058</h1>
+                <div>Rs.12,000.00</div>
+                <script type="application/ld+json">
+                {
+                    "@context": "https://schema.org",
+                    "@type": "Product",
+                    "name": "(Unstitched) 3 Piece - Pure Embroidered Cotton Net Suit S114058",
+                    "sku": "S114058",
+                    "offers": [
+                        {
+                            "name": "Rs.{{amount}}",
+                            "sku": "",
+                            "availability": "https://schema.org/InStock"
+                        }
+                    ]
+                }
+                </script>
+            </body>
+        </html>
+        """
+
+        adapter.fetch_url = lambda url: html
+        product = Product(
+            brand=self.brand,
+            source_url="https://pk.aghanoorofficial.com/products/unstitched-3-piece-pure-embroidered-cotton-net-suit-s114058",
+            manual_price=Decimal("12000.00"),
+        )
+
+        payload = adapter.fetch_product(product)
+
+        self.assertEqual(payload["title"], "(Unstitched) 3 Piece - Pure Embroidered Cotton Net Suit S114058")
+        self.assertEqual(payload["source_sku"], "S114058")
+        self.assertEqual(payload["variants"], [])
 
 
 @override_settings(MEDIA_ROOT=TEST_MEDIA_ROOT)
